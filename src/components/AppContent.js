@@ -3,7 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { CContainer, CSpinner } from '@coreui/react'
 
 // routes config
-import routes from '../routes'
+import routes from '../config/routes'
+import PrivateRoute from './PrivateRoute'
 
 const AppContent = () => {
   return (
@@ -18,7 +19,11 @@ const AppContent = () => {
                   path={route.path}
                   exact={route.exact}
                   name={route.name}
-                  element={<route.element />}
+                  element={
+                    <PrivateRoute roles={route.roles}>
+                      <route.element />
+                    </PrivateRoute>
+                  }
                 />
               )
             )

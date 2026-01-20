@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import {
@@ -13,6 +13,7 @@ import {
   CNavLink,
   CNavItem,
   useColorModes,
+  CBadge,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import {
@@ -27,10 +28,14 @@ import {
 
 import { AppBreadcrumb } from './index'
 import { AppHeaderDropdown } from './header/index'
+import { useAuth } from '../context/AuthContext'
+import NotificationService from '../services/notificationService'
 
 const AppHeader = () => {
   const headerRef = useRef()
   const { colorMode, setColorMode } = useColorModes('coreui-free-react-admin-template-theme')
+  const { user } = useAuth()
+  const [notificationCount, setNotificationCount] = useState(0)
 
   const dispatch = useDispatch()
   const sidebarShow = useSelector((state) => state.sidebarShow)
@@ -44,6 +49,17 @@ const AppHeader = () => {
     document.addEventListener('scroll', handleScroll)
     return () => document.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    if (user) {
+      NotificationService.getNotifications()
+        .then((res) => {
+          // Count unread or just total for now
+          setNotificationCount(res.data.length)
+        })
+        .catch((err) => console.error(err))
+    }
+  }, [user])
 
   return (
     <CHeader position="sticky" className="mb-4 p-0" ref={headerRef}>
@@ -60,24 +76,23 @@ const AppHeader = () => {
               Dashboard
             </CNavLink>
           </CNavItem>
-          <CNavItem>
-            <CNavLink href="#">Users</CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink href="#">Settings</CNavLink>
-          </CNavItem>
         </CHeaderNav>
         <CHeaderNav className="ms-auto">
           <CNavItem>
             <CNavLink href="#">
               <CIcon icon={cilBell} size="lg" />
+              {notificationCount > 0 && (
+                <CBadge color="danger" className="ms-2" shape="rounded-pill">
+                  {notificationCount}
+                </CBadge>
+              )}
             </CNavLink>
           </CNavItem>
-          <CNavItem>
+          {/* <CNavItem>
             <CNavLink href="#">
               <CIcon icon={cilList} size="lg" />
             </CNavLink>
-          </CNavItem>
+          </CNavItem> */}
           <CNavItem>
             <CNavLink href="#">
               <CIcon icon={cilEnvelopeOpen} size="lg" />
@@ -130,6 +145,9 @@ const AppHeader = () => {
           </CDropdown>
           <li className="nav-item py-1">
             <div className="vr h-100 mx-2 text-body text-opacity-75"></div>
+          </li>
+          <li className="nav-item py-1 d-flex align-items-center me-2">
+            <strong>Hello, {user?.username || 'User'}</strong>
           </li>
           <AppHeaderDropdown />
         </CHeaderNav>

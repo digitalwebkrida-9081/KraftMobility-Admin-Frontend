@@ -114,3 +114,8 @@
     background-color: var(--#{$prefix}secondary-bg);
   }
 }
+
+input::placeholder {
+  color: #43494d !important;
+  opacity: 1 !important;
+}
