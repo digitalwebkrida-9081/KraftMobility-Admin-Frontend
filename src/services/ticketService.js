@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { authService } from './authService'
 
-const API_URL = 'http://localhost:5000/api/tickets/'
+const API_URL = 'https://servicekraft.digitalwebkrida.com/api/tickets/'
 
 const createTicket = (service, description) => {
   const token = authService.getToken()
