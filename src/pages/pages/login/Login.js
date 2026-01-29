@@ -33,7 +33,7 @@ const Login = () => {
       await login(email, password)
       navigate('/')
     } catch (err) {
-      setError('Failed to login. Please check your credentials.')
+      setError(err.message || 'Failed to login. Please check your credentials.')
     }
   }
 
@@ -82,7 +82,7 @@ const Login = () => {
                     </CInputGroup>
 
                     <CInputGroup className="mb-4">
-                      <CInputGroupText className="bg-light border-0 px-3 text-dark" >
+                      <CInputGroupText className="bg-light border-0 px-3 text-dark">
                         <CIcon icon={cilLockLocked} />
                       </CInputGroupText>
                       <CFormInput
@@ -111,6 +111,11 @@ const Login = () => {
                         <CButton color="link" className="px-0 text-decoration-none">
                           Forgot password?
                         </CButton>
+                      </CCol>
+                      <CCol xs={12} className="text-center mt-3">
+                        <p>
+                          Don't have an account? <Link to="/register">Register Now</Link>
+                        </p>
                       </CCol>
                     </CRow>
                   </CForm>

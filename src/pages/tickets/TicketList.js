@@ -19,13 +19,14 @@ import {
   CModalFooter,
   CForm,
   CFormLabel,
-  CFormInput,
+  CFormSelect as CSelect, // Alias if needed, but CFormSelect is fine
   CFormTextarea,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPencil, cilTrash, cilClock, cilCheck, cilX } from '@coreui/icons'
+import { cilPencil, cilTrash, cilClock, cilImage } from '@coreui/icons'
 import TicketService from '../../services/ticketService'
 import { authService } from '../../services/authService'
+import UserService from '../../services/userService'
 
 const MySwal = withReactContent(Swal)
 
@@ -39,14 +40,49 @@ const TicketList = () => {
   const [editingTicket, setEditingTicket] = useState(null)
   const [formData, setFormData] = useState({ service: '', description: '' })
 
+  // Assign Modal State
+  const [assignVisible, setAssignVisible] = useState(false)
+  const [operators, setOperators] = useState([])
+  const [selectedOperatorId, setSelectedOperatorId] = useState('')
+  const [assignTicketId, setAssignTicketId] = useState(null)
+
+  // Notes Modal State
+  const [notesVisible, setNotesVisible] = useState(false)
+  const [selectedTicketId, setSelectedTicketId] = useState(null)
+  const [currentTicketNotes, setCurrentTicketNotes] = useState([])
+  const [noteText, setNoteText] = useState('')
+
+  // Image Modal State
+  const [imageModalVisible, setImageModalVisible] = useState(false)
+  const [currentImageUrl, setCurrentImageUrl] = useState('')
+
   useEffect(() => {
     retrieveTickets()
     const user = authService.getCurrentUser()
     if (user) {
       setUserRole(user.role)
       setCurrentUserId(user.id)
+
+      if (user.role === 'Admin') {
+        UserService.getUsers()
+          .then((res) => {
+            // Filter for operators.
+            // Ensure we handle inconsistent role naming if any, but backend says 'Operator'
+            const ops = res.data.filter((u) => u.role === 'Operator')
+            setOperators(ops)
+          })
+          .catch((err) => console.log(err))
+      }
     }
   }, [])
+
+  // Update notes in modal if tickets change (e.g. after adding a note)
+  useEffect(() => {
+    if (selectedTicketId && visible === false) {
+      const t = tickets.find((x) => x.id === selectedTicketId)
+      if (t) setCurrentTicketNotes(t.notes || [])
+    }
+  }, [tickets, selectedTicketId, visible])
 
   const retrieveTickets = () => {
     TicketService.getTickets()
@@ -113,7 +149,6 @@ const TicketList = () => {
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Yes, extend it!',
       didOpen: () => {
-        // Optional: Add a dynamic output to show the current value
         const range = Swal.getInput()
         const output = document.createElement('output')
         output.style.display = 'block'
@@ -160,6 +195,37 @@ const TicketList = () => {
       })
   }
 
+  // --- Assign Logic ---
+  const openAssignModal = (ticket) => {
+    setAssignTicketId(ticket.id)
+    setSelectedOperatorId(ticket.assignedTo || '')
+    setAssignVisible(true)
+  }
+
+  const handleAssignSubmit = () => {
+    if (!selectedOperatorId) {
+      toast.error('Please select an operator')
+      return
+    }
+    // Find operator to get name
+    const operator = operators.find(
+      (o) => o.id === parseInt(selectedOperatorId) || o._id === parseInt(selectedOperatorId),
+    )
+    const operatorName = operator ? operator.username : ''
+
+    TicketService.assignTicket(assignTicketId, selectedOperatorId, operatorName)
+      .then(() => {
+        setAssignVisible(false)
+        retrieveTickets()
+        toast.success(`Ticket assigned to ${operatorName}`)
+      })
+      .catch((e) => {
+        console.log(e)
+        toast.error('Failed to assign ticket')
+      })
+  }
+  // --------------------
+
   const getBadge = (status) => {
     switch (status) {
       case 'Completed':
@@ -178,20 +244,22 @@ const TicketList = () => {
     return new Date(dateString) < new Date()
   }
 
-  const canManage = (ticket) => {
-    // Admin/Operator can manage any. User can manage own.
-    if (['Admin', 'Operator'].includes(userRole)) return true
-    if (ticket.userId === currentUserId) return true
-    return false
-  }
-
   const canEdit = (ticket) => {
     // ONLY the ticket creator can edit the ticket details.
     if (ticket.userId === currentUserId) return true
     return false
   }
 
-  const canUpdateStatus = ['Admin', 'Operator'].includes(userRole)
+  const canUpdateStatus =
+    userRole === 'Admin' || authService.getPermissions()['tickets']?.includes('action')
+
+  // --- Notes Logic ---
+  const openNotesModal = (ticket) => {
+    setSelectedTicketId(ticket.id)
+    setCurrentTicketNotes(ticket.notes || [])
+    setNoteText('')
+    setNotesVisible(true)
+  }
 
   const handleAddNote = (e) => {
     e.preventDefault()
@@ -200,14 +268,8 @@ const TicketList = () => {
     TicketService.addNote(selectedTicketId, noteText)
       .then(() => {
         setNoteText('')
-        // Refresh tickets to show new note
         retrieveTickets()
         toast.success('Note added successfully')
-        // If we are viewing details, update the selected ticket (optional, or just close)
-        // For simplicity, we might just alert or auto-refresh.
-        // Better UX: keep modal open and refresh notes list.
-        // Since we are not fetching single ticket details separately in this view,
-        // we might need to find the updated ticket in the new list.
       })
       .catch((e) => {
         console.log(e)
@@ -215,28 +277,12 @@ const TicketList = () => {
       })
   }
 
-  // To display notes, we might need a separate modal or expand the row.
-  // Let's use a "View Notes" modal for simplicity.
-  const [notesVisible, setNotesVisible] = useState(false)
-  const [selectedTicketId, setSelectedTicketId] = useState(null)
-  const [currentTicketNotes, setCurrentTicketNotes] = useState([])
-  const [noteText, setNoteText] = useState('')
-
-  const openNotesModal = (ticket) => {
-    setSelectedTicketId(ticket.id)
-    setCurrentTicketNotes(ticket.notes || [])
-    setNoteText('')
-    setNotesVisible(true)
+  const openImageModal = (imageUrl) => {
+    const fullUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/../${imageUrl}`
+    setCurrentImageUrl(fullUrl)
+    setImageModalVisible(true)
   }
-
-  // When tickets refresh, update the currentTicketNotes if modal is open
-  useEffect(() => {
-    if (selectedTicketId && visible === false) {
-      // Only update if NOT editing (optimization?)
-      const t = tickets.find((x) => x.id === selectedTicketId)
-      if (t) setCurrentTicketNotes(t.notes || [])
-    }
-  }, [tickets, selectedTicketId, visible])
+  // -------------------
 
   return (
     <>
@@ -268,6 +314,13 @@ const TicketList = () => {
                     <small className="text-muted">User: {ticket.userEmail}</small>
                   </div>
                 )}
+                {ticket.assignedToName && (
+                  <div className="mt-2 text-info">
+                    <small>
+                      Assigned to: <strong>{ticket.assignedToName}</strong>
+                    </small>
+                  </div>
+                )}
               </CCardBody>
               <CCardFooter className="bg-transparent border-top-0">
                 <div className="d-flex justify-content-between align-items-center">
@@ -295,6 +348,30 @@ const TicketList = () => {
                       Notes ({ticket.notes ? ticket.notes.length : 0})
                     </CButton>
 
+                    {ticket.image && (
+                      <CButton
+                        color="secondary"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openImageModal(ticket.image)}
+                        title="View Attachment"
+                      >
+                        <CIcon icon={cilImage} />
+                      </CButton>
+                    )}
+
+                    {userRole === 'Admin' && (
+                      <CButton
+                        color="primary"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openAssignModal(ticket)}
+                        title="Assign Operator"
+                      >
+                        Assign
+                      </CButton>
+                    )}
+
                     {canEdit(ticket) && (
                       <>
                         <CButton
@@ -315,16 +392,21 @@ const TicketList = () => {
                         >
                           <CIcon icon={cilClock} />
                         </CButton>
-                        <CButton
-                          color="danger"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(ticket.id)}
-                          title="Delete"
-                        >
-                          <CIcon icon={cilTrash} />
-                        </CButton>
                       </>
+                    )}
+
+                    {(userRole === 'Admin' ||
+                      canEdit(ticket) ||
+                      authService.getPermissions()['tickets']?.includes('delete')) && (
+                      <CButton
+                        color="danger"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(ticket.id)}
+                        title="Delete"
+                      >
+                        <CIcon icon={cilTrash} />
+                      </CButton>
                     )}
                   </div>
                 </div>
@@ -338,6 +420,39 @@ const TicketList = () => {
           </CCol>
         )}
       </CRow>
+
+      {/* Assign Modal */}
+      <CModal visible={assignVisible} onClose={() => setAssignVisible(false)}>
+        <CModalHeader onClose={() => setAssignVisible(false)}>
+          <CModalTitle>Assign Ticket to Operator</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <CForm>
+            <div className="mb-3">
+              <CFormLabel>Select Operator</CFormLabel>
+              <CFormSelect
+                value={selectedOperatorId}
+                onChange={(e) => setSelectedOperatorId(e.target.value)}
+              >
+                <option value="">Select an Operator</option>
+                {operators.map((op) => (
+                  <option key={op.id || op._id} value={op.id || op._id}>
+                    {op.username}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+          </CForm>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setAssignVisible(false)}>
+            Close
+          </CButton>
+          <CButton color="primary" onClick={handleAssignSubmit}>
+            Assign
+          </CButton>
+        </CModalFooter>
+      </CModal>
 
       {/* Edit Modal */}
       <CModal visible={visible} onClose={() => setVisible(false)}>
@@ -422,6 +537,25 @@ const TicketList = () => {
             Close
           </CButton>
         </CModalFooter>
+      </CModal>
+
+      {/* Image View Modal */}
+      <CModal
+        visible={imageModalVisible}
+        onClose={() => setImageModalVisible(false)}
+        size="lg"
+        alignment="center"
+      >
+        <CModalHeader onClose={() => setImageModalVisible(false)}>
+          <CModalTitle>Attachment View</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="text-center">
+          <img
+            src={currentImageUrl}
+            alt="Attachment"
+            style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain' }}
+          />
+        </CModalBody>
       </CModal>
     </>
   )

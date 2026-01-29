@@ -35,6 +35,12 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: 'Ticket Analytics',
+    to: '/tickets/analytics',
+    icon: <CIcon icon={cilChartPie} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
     name: 'Create Ticket',
     to: '/tickets/create',
     icon: <CIcon icon={cilPencil} customClassName="nav-icon" />,

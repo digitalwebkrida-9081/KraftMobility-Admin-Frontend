@@ -67,7 +67,19 @@ const App = () => {
             />
           </Routes>
         </Suspense>
-        <ToastContainer />
+        <ToastContainer
+          position="top-center"
+          autoClose={3000}
+          hideProgressBar={true}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+          toastClassName="modern-toast"
+        />
       </AuthProvider>
     </HashRouter>
   )

@@ -8,6 +8,7 @@ import {
   CForm,
   CFormSelect,
   CFormTextarea,
+  CFormInput,
   CRow,
 } from '@coreui/react'
 import TicketService from '../../services/ticketService'
@@ -19,12 +20,20 @@ import { toast } from 'react-toastify'
 const CreateTicket = () => {
   const [service, setService] = useState('Visa Renewal')
   const [description, setDescription] = useState('')
+  const [image, setImage] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     const user = authService.getCurrentUser()
-    if (user && ['Admin', 'Operator', 'HR'].includes(user.role)) {
-      toast.error('Admins, Operators, and HR cannot create tickets.')
+    const permissions = authService.getPermissions()
+
+    // Check if user has 'add' permission for 'tickets'
+    // defined in backend/src/controllers/permission.controller.js as "add"
+    // Restrict creation to End-Users only
+    const canCreate = !['Admin', 'Operator', 'HR'].includes(user?.role)
+
+    if (!canCreate) {
+      toast.error('You do not have permission to create tickets.')
       navigate('/tickets')
     }
   }, [navigate])
@@ -33,7 +42,7 @@ const CreateTicket = () => {
     e.preventDefault()
 
     try {
-      await TicketService.createTicket(service, description)
+      await TicketService.createTicket(service, description, image)
       toast.success('Ticket created successfully!')
       navigate('/tickets')
     } catch (error) {
@@ -67,6 +76,15 @@ const CreateTicket = () => {
                     'Maintenance',
                     'Other',
                   ]}
+                />
+              </div>
+              <div className="mb-3">
+                <CFormInput
+                  type="file"
+                  id="image"
+                  label="Upload Photos (Optional)"
+                  accept="image/*"
+                  onChange={(e) => setImage(e.target.files[0])}
                 />
               </div>
               <div className="mb-3">

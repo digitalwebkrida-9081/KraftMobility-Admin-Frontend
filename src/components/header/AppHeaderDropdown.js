@@ -20,6 +20,7 @@ import {
   cilTask,
   cilUser,
   cilAccountLogout,
+  cilPhone,
 } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import { useNavigate } from 'react-router-dom'
@@ -28,7 +29,7 @@ import { useAuth } from '../../context/AuthContext'
 import avatar8 from './../../assets/images/avatars/8.jpg'
 
 const AppHeaderDropdown = () => {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -43,6 +44,10 @@ const AppHeaderDropdown = () => {
       </CDropdownToggle>
       <CDropdownMenu className="pt-0" placement="bottom-end">
         <CDropdownHeader className="bg-body-secondary fw-semibold mb-2">Account</CDropdownHeader>
+        <CDropdownItem href="#">
+          <CIcon icon={cilPhone} className="me-2" />
+          {user?.phoneNumber || 'No Phone'}
+        </CDropdownItem>
         {/* <CDropdownItem href="#">
           <CIcon icon={cilBell} className="me-2" />
           Updates

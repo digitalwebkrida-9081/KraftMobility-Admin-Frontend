@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 export const authService = {
   login: async (email, password) => {
@@ -18,12 +18,41 @@ export const authService = {
     const data = await response.json()
     if (data.token) {
       localStorage.setItem('user', JSON.stringify(data))
+      if (data.permissions) {
+        localStorage.setItem('permissions', JSON.stringify(data.permissions))
+      }
     }
     return data.user
   },
 
+  register: async (userData) => {
+    const response = await fetch(`${API_URL}/auth/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Registration failed')
+    }
+
+    return await response.json()
+  },
+
   logout: () => {
     localStorage.removeItem('user')
+    localStorage.removeItem('permissions')
+  },
+
+  getPermissions: () => {
+    const permStr = localStorage.getItem('permissions')
+    if (permStr) {
+      return JSON.parse(permStr)
+    }
+    return {}
   },
 
   getCurrentUser: () => {

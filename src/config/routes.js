@@ -54,6 +54,9 @@ const UserList = React.lazy(() => import('../pages/users/UserList'))
 const CreateUser = React.lazy(() => import('../pages/users/CreateUser'))
 const CreateTicket = React.lazy(() => import('../pages/tickets/CreateTicket'))
 const TicketList = React.lazy(() => import('../pages/tickets/TicketList'))
+const ModulePermissions = React.lazy(() => import('../pages/admin/ModulePermissions'))
+const ApprovalList = React.lazy(() => import('../pages/users/ApprovalList'))
+const TicketAnalytics = React.lazy(() => import('../pages/tickets/TicketAnalytics'))
 
 const routes = [
   { path: '/', exact: true, name: 'Home' },
@@ -104,8 +107,16 @@ const routes = [
   { path: '/users', name: 'Users', element: UserList, exact: true, roles: ['Admin'] },
   { path: '/users/create', name: 'Create User', element: CreateUser, roles: ['Admin'] },
   { path: '/users/edit/:id', name: 'Edit User', element: CreateUser, roles: ['Admin'] },
+  { path: '/users/approvals', name: 'Approval List', element: ApprovalList, roles: ['Admin'] },
   { path: '/tickets', name: 'Tickets', element: TicketList, exact: true },
   { path: '/tickets/create', name: 'Create Ticket', element: CreateTicket },
+  { path: '/tickets/analytics', name: 'Ticket Analytics', element: TicketAnalytics },
+  {
+    path: '/admin/permissions',
+    name: 'Module Permissions',
+    element: ModulePermissions,
+    roles: ['Admin'],
+  },
 ]
 
 export default routes

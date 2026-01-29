@@ -1,8 +1,8 @@
-@use "@coreui/coreui/scss/coreui" as * with ( 
-  $enable-deprecation-messages: false,
+@use '@coreui/coreui/scss/coreui' as * with (
+  $enable-deprecation-messages: false
 );
-@use "@coreui/chartjs/scss/coreui-chartjs";
-@use "vendors/simplebar";
+@use '@coreui/chartjs/scss/coreui-chartjs';
+@use 'vendors/simplebar';
 
 body {
   background-color: var(--cui-tertiary-bg);
@@ -12,7 +12,7 @@ body {
   width: 100%;
   padding-inline: var(--cui-sidebar-occupy-start, 0) var(--cui-sidebar-occupy-end, 0);
   will-change: auto;
-  @include transition(padding .15s);
+  @include transition(padding 0.15s);
 }
 
 .header > .container-fluid,
@@ -66,3 +66,98 @@ body {
   }
 }
 
+/* Modern Toast Styles */
+.Toastify__toast-container--top-center {
+  top: 2em !important;
+}
+
+.modern-toast {
+  border-radius: 50px !important;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  padding: 12px 18px !important;
+  font-weight: 500;
+  text-align: center;
+}
+
+.Toastify__toast-body {
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.Toastify__close-button {
+  align-self: center;
+  align-items: center;
+  margin-left: 20px;
+}
+
+/* Sidebar Highlight Customization */
+/* Sidebar Highlight Customization - Red for Pending */
+.nav-link.highlight-nav-item-red {
+  background: linear-gradient(
+    90deg,
+    rgba(229, 83, 83, 0.15) 0%,
+    rgba(229, 83, 83, 0.05) 100%
+  ) !important;
+  border-left: 4px solid #e55353 !important; /* Danger/Red color */
+  color: #fff !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  animation: pulse-border 2s infinite;
+}
+
+.nav-link.highlight-nav-item-red:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(229, 83, 83, 0.25) 0%,
+    rgba(229, 83, 83, 0.1) 100%
+  ) !important;
+  padding-left: calc(var(--cui-sidebar-nav-link-padding-x) + 0.2rem);
+}
+
+.nav-link.highlight-nav-item-red .nav-icon {
+  color: #e55353 !important;
+}
+
+@keyframes pulse-border {
+  0% {
+    border-left-color: #e55353;
+  }
+  50% {
+    border-left-color: #ff8a8a;
+  }
+  100% {
+    border-left-color: #e55353;
+  }
+}
+
+/* Sidebar Highlight Customization - Blue for No Pending (Default Highlight) */
+.nav-link.highlight-nav-item {
+  background: linear-gradient(
+    90deg,
+    rgba(51, 153, 255, 0.15) 0%,
+    rgba(51, 153, 255, 0.05) 100%
+  ) !important;
+  border-left: 4px solid #3399ff !important; /* Primary/Blue color */
+  color: #fff !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.nav-link.highlight-nav-item:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(51, 153, 255, 0.25) 0%,
+    rgba(51, 153, 255, 0.1) 100%
+  ) !important;
+  padding-left: calc(var(--cui-sidebar-nav-link-padding-x) + 0.2rem);
+}
+
+.nav-link.highlight-nav-item .nav-icon {
+  color: #3399ff !important;
+}

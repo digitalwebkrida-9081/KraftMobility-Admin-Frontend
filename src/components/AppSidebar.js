@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 
 import {
@@ -11,7 +11,7 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 
-import { cilUser } from '@coreui/icons'
+import { cilUser, cilSettings } from '@coreui/icons'
 import { CNavGroup, CNavItem } from '@coreui/react'
 import { useAuth } from '../context/AuthContext'
 import { AppSidebarNav } from './AppSidebarNav'
@@ -26,7 +26,7 @@ const AppSidebar = () => {
   const dispatch = useDispatch()
   const unfoldable = useSelector((state) => state.sidebarUnfoldable)
   const sidebarShow = useSelector((state) => state.sidebarShow)
-  const { user } = useAuth()
+  const { user, pendingCount } = useAuth()
 
   const navItems = [...navigation]
   if (user?.role === 'Admin') {
@@ -38,6 +38,17 @@ const AppSidebar = () => {
         to: '/users',
         icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
         items: [
+          {
+            component: CNavItem,
+            name: 'Approval Requests',
+            to: '/users/approvals',
+            className: pendingCount > 0 ? 'highlight-nav-item-red' : 'highlight-nav-item',
+          },
+          {
+            component: CNavItem,
+            name: 'Create User',
+            to: '/users/create',
+          },
           {
             component: CNavItem,
             name: 'All Users',
@@ -66,10 +77,23 @@ const AppSidebar = () => {
         ],
       })
     }
+
+    // if (!navItems.find((item) => item.name === 'Module Permissions')) {
+    //   navItems.splice(navItems.length, 0, {
+    //     component: CNavItem,
+    //     name: 'Module Permissions',
+    //     to: '/admin/permissions',
+    //     icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+    //   })
+    // }
   }
 
-  // Hide Create Ticket for Admin/Operator/HR
-  if (['Admin', 'Operator', 'HR'].includes(user?.role)) {
+  // Dynamic Permission Check for "Create Ticket"
+  const permissions = JSON.parse(localStorage.getItem('permissions') || '{}')
+  // Create Ticket is only for End-Users
+  const canCreateTicket = !['Admin', 'Operator', 'HR'].includes(user?.role)
+
+  if (!canCreateTicket) {
     // Filter out the 'Create Ticket' item
     const index = navItems.findIndex((item) => item.to === '/tickets/create')
     if (index !== -1) {

@@ -20,6 +20,7 @@ const CreateUser = () => {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
+    phoneNumber: '',
     password: '',
     role: 'End-User', // Default role
   })
@@ -35,6 +36,7 @@ const CreateUser = () => {
             setFormData({
               username: user.username,
               email: user.email,
+              phoneNumber: user.phoneNumber || '',
               password: '', // Don't populate password
               role: user.role,
             })
@@ -100,6 +102,16 @@ const CreateUser = () => {
                   value={formData.email}
                   onChange={handleChange}
                   required
+                />
+              </div>
+              <div className="mb-3">
+                <CFormInput
+                  type="text"
+                  id="phoneNumber"
+                  name="phoneNumber"
+                  label="Phone Number"
+                  value={formData.phoneNumber}
+                  onChange={handleChange}
                 />
               </div>
               <div className="mb-3">

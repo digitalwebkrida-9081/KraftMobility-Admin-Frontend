@@ -14,7 +14,7 @@ import {
   CTableRow,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPencil, cilTrash } from '@coreui/icons'
+import { cilPencil, cilTrash, cilCheck } from '@coreui/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { toast } from 'react-toastify'
@@ -25,7 +25,7 @@ const MySwal = withReactContent(Swal)
 
 const UserList = () => {
   const [users, setUsers] = useState([])
-  const { getUsers, deleteUser } = useAuth()
+  const { getUsers, deleteUser, updateUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const queryParams = new URLSearchParams(location.search)
@@ -72,6 +72,17 @@ const UserList = () => {
     navigate(`/users/edit/${id}`)
   }
 
+  const handleApprove = async (id) => {
+    try {
+      await updateUser(id, { status: 'approved' })
+      toast.success('User approved successfully')
+      fetchUsers()
+    } catch (error) {
+      console.error('Failed to approve user', error)
+      toast.error('Failed to approve user')
+    }
+  }
+
   const filteredUsers = roleFilter ? users.filter((user) => user.role === roleFilter) : users
 
   return (
@@ -94,7 +105,9 @@ const UserList = () => {
                 <CTableRow>
                   <CTableHeaderCell>Username</CTableHeaderCell>
                   <CTableHeaderCell>Email</CTableHeaderCell>
+                  <CTableHeaderCell>Phone Number</CTableHeaderCell>
                   <CTableHeaderCell>Role</CTableHeaderCell>
+                  <CTableHeaderCell>Status</CTableHeaderCell>
                   <CTableHeaderCell>Actions</CTableHeaderCell>
                 </CTableRow>
               </CTableHead>
@@ -103,7 +116,23 @@ const UserList = () => {
                   <CTableRow key={user.id}>
                     <CTableDataCell>{user.username}</CTableDataCell>
                     <CTableDataCell>{user.email}</CTableDataCell>
+                    <CTableDataCell>{user.phoneNumber || '-'}</CTableDataCell>
                     <CTableDataCell>{user.role}</CTableDataCell>
+                    <CTableDataCell>
+                      {user.status === 'pending' && (
+                        <CButton
+                          color="success"
+                          variant="ghost"
+                          size="sm"
+                          className="me-2"
+                          onClick={() => handleApprove(user.id)}
+                          title="Approve User"
+                        >
+                          <CIcon icon={cilCheck} />
+                        </CButton>
+                      )}
+                      {user.status}
+                    </CTableDataCell>
                     <CTableDataCell>
                       <CButton
                         color="info"
