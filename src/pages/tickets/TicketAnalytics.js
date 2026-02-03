@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   CButton,
   CCard,
@@ -9,6 +10,7 @@ import {
   CModalHeader,
   CModalTitle,
   CModalFooter,
+  CFormInput,
   CRow,
   CFormSelect,
   CForm,
@@ -36,6 +38,7 @@ import {
   cilDrop,
   cilBrush,
   cilBolt,
+  cilPlus,
 } from '@coreui/icons'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
@@ -48,6 +51,7 @@ import TicketService from '../../services/ticketService'
 import { authService } from '../../services/authService'
 
 const TicketAnalytics = () => {
+  const navigate = useNavigate()
   const [tickets, setTickets] = useState([])
   const [stats, setStats] = useState({
     total: 0,
@@ -73,6 +77,11 @@ const TicketAnalytics = () => {
 
   const [userRole, setUserRole] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
+
+  // Edit Modal State
+  const [editVisible, setEditVisible] = useState(false)
+  const [editingTicket, setEditingTicket] = useState(null)
+  const [formData, setFormData] = useState({ service: '', description: '' })
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -286,10 +295,86 @@ const TicketAnalytics = () => {
     setImageModalVisible(true)
   }
 
+  const handleExtend = (id) => {
+    MySwal.fire({
+      title: 'Extend Ticket?',
+      text: 'Select the number of days to extend:',
+      icon: 'question',
+      input: 'range',
+      inputLabel: 'Days',
+      inputAttributes: {
+        min: 1,
+        max: 30,
+        step: 1,
+      },
+      inputValue: 8,
+      showCancelButton: true,
+      confirmButtonColor: '#f0ad4e',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, extend it!',
+      didOpen: () => {
+        const range = Swal.getInput()
+        const output = document.createElement('output')
+        output.style.display = 'block'
+        output.style.marginTop = '10px'
+        output.style.fontWeight = 'bold'
+        output.textContent = range.value + ' Days'
+        range.parentNode.insertBefore(output, range.nextSibling)
+        range.addEventListener('input', () => {
+          output.textContent = range.value + ' Days'
+        })
+      },
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const days = result.value
+        TicketService.extendTicket(id, days)
+          .then(() => {
+            retrieveTickets()
+            toast.success(`Ticket extended by ${days} days`)
+          })
+          .catch((e) => {
+            console.log(e)
+            toast.error('Failed to extend ticket')
+          })
+      }
+    })
+  }
+
+  const openEditModal = (ticket) => {
+    setEditingTicket(ticket)
+    setFormData({ service: ticket.service, description: ticket.description })
+    setEditVisible(true)
+  }
+
+  const handleEditSubmit = () => {
+    TicketService.updateTicket(editingTicket.id, formData)
+      .then(() => {
+        setEditVisible(false)
+        retrieveTickets()
+        toast.success('Ticket updated successfully')
+      })
+      .catch((e) => {
+        console.log(e)
+        toast.error('Failed to update ticket')
+      })
+  }
+
   return (
     <div className="container-fluid px-4 fade-in">
       {/* Used text-body to adapt to theme */}
-      <h2 className="mb-4 fw-bold">Analytics Dashboard</h2>
+      {/* Used text-body to adapt to theme */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="fw-bold mb-0">Analytics Dashboard</h2>
+        {(userRole === 'End-User' || userRole === 'User') && (
+          <CButton
+            color="primary"
+            className="rounded-pill px-4"
+            onClick={() => navigate('/tickets/create')}
+          >
+            <CIcon icon={cilPlus} className="me-2" /> Create Ticket
+          </CButton>
+        )}
+      </div>
 
       {/* Stats Cards */}
       <CRow className="mb-5 g-4">
@@ -366,7 +451,7 @@ const TicketAnalytics = () => {
           </CButton>
         </div>
 
-        <div className="table-responsive">
+        <div>
           <table className="ticket-table align-middle">
             <thead>
               <tr>
@@ -548,9 +633,28 @@ const TicketAnalytics = () => {
                             <CIcon icon={cilUser} className="me-2" /> Assign Operator
                           </CDropdownItem>
                         )}
-                        <CDropdownItem onClick={() => openNotesModal(item)}>
+                        <CDropdownItem
+                          onClick={() => openNotesModal(item)}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <CIcon icon={cilDescription} className="me-2" /> Manage Notes
                         </CDropdownItem>
+                        {String(item.userId) === String(currentUserId) && (
+                          <>
+                            <CDropdownItem
+                              onClick={() => openEditModal(item)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <CIcon icon={cilPencil} className="me-2" /> Edit Ticket
+                            </CDropdownItem>
+                            <CDropdownItem
+                              onClick={() => handleExtend(item.id)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <CIcon icon={cilClock} className="me-2" /> Extend Expiry
+                            </CDropdownItem>
+                          </>
+                        )}
                       </CDropdownMenu>
                     </CDropdown>
                   </td>
@@ -698,6 +802,41 @@ const TicketAnalytics = () => {
             style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain' }}
           />
         </CModalBody>
+      </CModal>
+
+      {/* Edit Modal */}
+      <CModal visible={editVisible} onClose={() => setEditVisible(false)}>
+        <CModalHeader onClose={() => setEditVisible(false)}>
+          <CModalTitle>Edit Ticket</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <CForm>
+            <div className="mb-3">
+              <CFormLabel>Service</CFormLabel>
+              <CFormSelect
+                value={formData.service}
+                onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                options={['Plumbing', 'Electrical', 'Carpentry', 'Gas', 'Others']}
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel>Description</CFormLabel>
+              <CFormTextarea
+                rows={3}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+          </CForm>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setEditVisible(false)}>
+            Close
+          </CButton>
+          <CButton color="primary" onClick={handleEditSubmit}>
+            Save changes
+          </CButton>
+        </CModalFooter>
       </CModal>
     </div>
   )

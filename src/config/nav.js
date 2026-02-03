@@ -27,24 +27,19 @@ const _nav = [
     //   text: 'NEW',
     // },
   },
-  {
-    component: CNavItem,
-    name: 'Tickets',
-    to: '/tickets',
-    icon: <CIcon icon={cilNotes} customClassName="nav-icon" />,
-  },
+  // {
+  //   component: CNavItem,
+  //   name: 'Tickets',
+  //   to: '/tickets',
+  //   icon: <CIcon icon={cilNotes} customClassName="nav-icon" />,
+  // },
   {
     component: CNavItem,
     name: 'Ticket Analytics',
     to: '/tickets/analytics',
     icon: <CIcon icon={cilChartPie} customClassName="nav-icon" />,
   },
-  {
-    component: CNavItem,
-    name: 'Create Ticket',
-    to: '/tickets/create',
-    icon: <CIcon icon={cilPencil} customClassName="nav-icon" />,
-  },
+
   // {
   //   component: CNavTitle,
   //   name: 'Theme',

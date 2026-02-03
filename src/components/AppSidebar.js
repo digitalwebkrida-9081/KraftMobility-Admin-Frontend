@@ -88,19 +88,6 @@ const AppSidebar = () => {
     // }
   }
 
-  // Dynamic Permission Check for "Create Ticket"
-  const permissions = JSON.parse(localStorage.getItem('permissions') || '{}')
-  // Create Ticket is only for End-Users
-  const canCreateTicket = !['Admin', 'Operator', 'HR'].includes(user?.role)
-
-  if (!canCreateTicket) {
-    // Filter out the 'Create Ticket' item
-    const index = navItems.findIndex((item) => item.to === '/tickets/create')
-    if (index !== -1) {
-      navItems.splice(index, 1)
-    }
-  }
-
   return (
     <CSidebar
       className="border-end"
