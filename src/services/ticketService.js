@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { authService } from './authService'
 
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/tickets/`
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5656/api'}/tickets/`
 
 const createTicket = (service, description, image) => {
   const token = authService.getToken()
@@ -15,7 +15,6 @@ const createTicket = (service, description, image) => {
   return axios.post(API_URL, formData, {
     headers: {
       Authorization: 'Bearer ' + token,
-      'Content-Type': 'multipart/form-data',
     },
   })
 }
@@ -31,7 +30,14 @@ const getTickets = () => {
 
 const updateTicket = (id, data) => {
   const token = authService.getToken()
-  return axios.put(API_URL + id, data, {
+  const formData = new FormData()
+  if (data.service) formData.append('service', data.service)
+  if (data.description) formData.append('description', data.description)
+  if (data.status) formData.append('status', data.status)
+  // Assuming frontend passes 'image' as File object if we add that later
+  if (data.image) formData.append('image', data.image)
+
+  return axios.put(API_URL + id, formData, {
     headers: {
       Authorization: 'Bearer ' + token,
     },
@@ -40,15 +46,14 @@ const updateTicket = (id, data) => {
 
 const updateTicketStatus = (id, status) => {
   const token = authService.getToken()
-  return axios.put(
-    API_URL + id,
-    { status },
-    {
-      headers: {
-        Authorization: 'Bearer ' + token,
-      },
+  const formData = new FormData()
+  formData.append('status', status)
+
+  return axios.put(API_URL + id, formData, {
+    headers: {
+      Authorization: 'Bearer ' + token,
     },
-  )
+  })
 }
 
 const deleteTicket = (id) => {

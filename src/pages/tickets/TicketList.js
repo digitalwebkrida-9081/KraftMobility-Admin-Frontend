@@ -208,9 +208,7 @@ const TicketList = () => {
       return
     }
     // Find operator to get name
-    const operator = operators.find(
-      (o) => o.id === parseInt(selectedOperatorId) || o._id === parseInt(selectedOperatorId),
-    )
+    const operator = operators.find((o) => String(o.id || o._id) === String(selectedOperatorId))
     const operatorName = operator ? operator.username : ''
 
     TicketService.assignTicket(assignTicketId, selectedOperatorId, operatorName)
@@ -246,7 +244,7 @@ const TicketList = () => {
 
   const canEdit = (ticket) => {
     // ONLY the ticket creator can edit the ticket details.
-    if (ticket.userId === currentUserId) return true
+    if (String(ticket.userId) === String(currentUserId)) return true
     return false
   }
 
@@ -278,7 +276,7 @@ const TicketList = () => {
   }
 
   const openImageModal = (imageUrl) => {
-    const fullUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/../${imageUrl}`
+    const fullUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5656/api'}/../${imageUrl}`
     setCurrentImageUrl(fullUrl)
     setImageModalVisible(true)
   }
@@ -466,7 +464,7 @@ const TicketList = () => {
               <CFormSelect
                 value={formData.service}
                 onChange={(e) => setFormData({ ...formData, service: e.target.value })}
-                options={['Visa Renewal', 'Household', 'Furniture Service', 'Maintenance', 'Other']}
+                options={['Plumbing', 'Electrical', 'Carpentry', 'Gas', 'Others']}
               />
             </div>
             <div className="mb-3">

@@ -8,6 +8,7 @@ import {
   CForm,
   CFormInput,
   CFormSelect,
+  CFormTextarea,
   CRow,
 } from '@coreui/react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -23,6 +24,8 @@ const CreateUser = () => {
     phoneNumber: '',
     password: '',
     role: 'End-User', // Default role
+    location: 'Bangalore',
+    propertyAddress: '',
   })
   const [error, setError] = useState('')
 
@@ -39,6 +42,8 @@ const CreateUser = () => {
               phoneNumber: user.phoneNumber || '',
               password: '', // Don't populate password
               role: user.role,
+              location: user.location || 'Bangalore',
+              propertyAddress: user.propertyAddress || '',
             })
           }
         } catch (err) {
@@ -55,6 +60,20 @@ const CreateUser = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(formData.email)) {
+      setError('Invalid email address format.')
+      return
+    }
+
+    const phoneRegex = /^\+?[0-9\s\-]{10,20}$/
+    if (formData.phoneNumber && !phoneRegex.test(formData.phoneNumber)) {
+      setError('Invalid phone number format.')
+      return
+    }
+
     try {
       if (id) {
         // If editing, password is optional. If empty, remove it from payload
@@ -114,6 +133,37 @@ const CreateUser = () => {
                   onChange={handleChange}
                 />
               </div>
+
+              <div className="mb-3">
+                <CFormSelect
+                  id="location"
+                  name="location"
+                  label="Location"
+                  value={formData.location}
+                  onChange={handleChange}
+                >
+                  <option value="Bangalore">Bangalore</option>
+                  <option value="Ahmedabad">Ahmedabad</option>
+                  <option value="Guwahati">Guwahati</option>
+                  <option value="Mumbai">Mumbai</option>
+                  <option value="Pune">Pune</option>
+                  <option value="Chennai">Chennai</option>
+                  <option value="Hyderabad">Hyderabad</option>
+                  <option value="Gurgaon">Gurgaon</option>
+                </CFormSelect>
+              </div>
+
+              <div className="mb-3">
+                <CFormTextarea
+                  id="propertyAddress"
+                  name="propertyAddress"
+                  label="Property Address"
+                  rows={2}
+                  value={formData.propertyAddress}
+                  onChange={handleChange}
+                />
+              </div>
+
               <div className="mb-3">
                 <CFormInput
                   type="password"

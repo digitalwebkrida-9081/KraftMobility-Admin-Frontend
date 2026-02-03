@@ -12,9 +12,14 @@ import {
   CTableHead,
   CTableHeaderCell,
   CTableRow,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPencil, cilTrash, cilCheck } from '@coreui/icons'
+import { cilPencil, cilTrash, cilCheck, cilMagnifyingGlass } from '@coreui/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { toast } from 'react-toastify'
@@ -30,6 +35,14 @@ const UserList = () => {
   const location = useLocation()
   const queryParams = new URLSearchParams(location.search)
   const roleFilter = queryParams.get('role')
+
+  const [visible, setVisible] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+
+  const handleView = (user) => {
+    setSelectedUser(user)
+    setVisible(true)
+  }
 
   const fetchUsers = async () => {
     try {
@@ -83,7 +96,11 @@ const UserList = () => {
     }
   }
 
-  const filteredUsers = roleFilter ? users.filter((user) => user.role === roleFilter) : users
+  const filteredUsers = users.filter((user) => {
+    const roleMatch = roleFilter ? user.role === roleFilter : true
+    const statusMatch = user.status === 'approved'
+    return roleMatch && statusMatch
+  })
 
   return (
     <CRow>
@@ -107,7 +124,8 @@ const UserList = () => {
                   <CTableHeaderCell>Email</CTableHeaderCell>
                   <CTableHeaderCell>Phone Number</CTableHeaderCell>
                   <CTableHeaderCell>Role</CTableHeaderCell>
-                  <CTableHeaderCell>Status</CTableHeaderCell>
+                  <CTableHeaderCell>Location</CTableHeaderCell>
+                  <CTableHeaderCell>Property Address</CTableHeaderCell>
                   <CTableHeaderCell>Actions</CTableHeaderCell>
                 </CTableRow>
               </CTableHead>
@@ -118,22 +136,25 @@ const UserList = () => {
                     <CTableDataCell>{user.email}</CTableDataCell>
                     <CTableDataCell>{user.phoneNumber || '-'}</CTableDataCell>
                     <CTableDataCell>{user.role}</CTableDataCell>
-                    <CTableDataCell>
-                      {user.status === 'pending' && (
-                        <CButton
-                          color="success"
-                          variant="ghost"
-                          size="sm"
-                          className="me-2"
-                          onClick={() => handleApprove(user.id)}
-                          title="Approve User"
-                        >
-                          <CIcon icon={cilCheck} />
-                        </CButton>
-                      )}
-                      {user.status}
+                    <CTableDataCell>{user.location || '-'}</CTableDataCell>
+                    <CTableDataCell
+                      className="text-truncate"
+                      style={{ maxWidth: '150px' }}
+                      title={user.propertyAddress}
+                    >
+                      {user.propertyAddress || '-'}
                     </CTableDataCell>
                     <CTableDataCell>
+                      <CButton
+                        color="primary"
+                        variant="ghost"
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleView(user)}
+                        title="View Details"
+                      >
+                        <CIcon icon={cilMagnifyingGlass} />
+                      </CButton>
                       <CButton
                         color="info"
                         variant="ghost"
@@ -159,6 +180,48 @@ const UserList = () => {
           </CCardBody>
         </CCard>
       </CCol>
+
+      <CModal visible={visible} onClose={() => setVisible(false)} alignment="center">
+        <CModalHeader onClose={() => setVisible(false)}>
+          <CModalTitle>User Details</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {selectedUser && (
+            <div>
+              <p>
+                <strong>Username:</strong> {selectedUser.username}
+              </p>
+              <p>
+                <strong>Email:</strong> {selectedUser.email}
+              </p>
+              <p>
+                <strong>Phone Number:</strong> {selectedUser.phoneNumber || 'N/A'}
+              </p>
+              <p>
+                <strong>Role:</strong> {selectedUser.role}
+              </p>
+              <p>
+                <strong>Location:</strong> {selectedUser.location || 'N/A'}
+              </p>
+              <p>
+                <strong>Status:</strong> {selectedUser.status}
+              </p>
+              <hr />
+              <p>
+                <strong>Property Address:</strong>
+              </p>
+              <div className="p-2 bg-light text-dark border rounded">
+                {selectedUser.propertyAddress || 'N/A'}
+              </div>
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setVisible(false)}>
+            Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
     </CRow>
   )
 }

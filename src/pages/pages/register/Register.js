@@ -7,6 +7,8 @@ import {
   CContainer,
   CForm,
   CFormInput,
+  CFormSelect,
+  CFormTextarea,
   CInputGroup,
   CInputGroupText,
   CRow,
@@ -20,6 +22,8 @@ const Register = () => {
   const [username, setUsername] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [phoneNumber, setPhoneNumber] = React.useState('')
+  const [location, setLocation] = React.useState('Bangalore')
+  const [propertyAddress, setPropertyAddress] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [repeatPassword, setRepeatPassword] = React.useState('')
   const [error, setError] = React.useState('')
@@ -35,8 +39,27 @@ const Register = () => {
       return
     }
 
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(email)) {
+      setError('Invalid email address format.')
+      return
+    }
+
+    const phoneRegex = /^\+?[0-9\s\-]{10,20}$/
+    if (phoneNumber && !phoneRegex.test(phoneNumber)) {
+      setError('Invalid phone number format. Use digits, spaces, or dashes.')
+      return
+    }
+
     try {
-      await authService.register({ username, email, password, phoneNumber })
+      await authService.register({
+        username,
+        email,
+        password,
+        phoneNumber,
+        location,
+        propertyAddress,
+      })
       setSuccess('Registration successful! Please wait for admin approval.')
     } catch (err) {
       setError(err.message)
@@ -93,6 +116,36 @@ const Register = () => {
                       required
                     />
                   </CInputGroup>
+
+                  <div className="mb-3">
+                    <CFormSelect
+                      className="mb-3"
+                      aria-label="Location Select"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      options={[
+                        'Bangalore',
+                        'Ahmedabad',
+                        'Guwahati',
+                        'Mumbai',
+                        'Pune',
+                        'Chennai',
+                        'Hyderabad',
+                        'Gurgaon',
+                      ]}
+                    />
+                  </div>
+                  <CInputGroup className="mb-3">
+                    <CInputGroupText>Address</CInputGroupText>
+                    <CFormTextarea
+                      placeholder="Property Address"
+                      rows={2}
+                      value={propertyAddress}
+                      onChange={(e) => setPropertyAddress(e.target.value)}
+                      required
+                    />
+                  </CInputGroup>
+
                   <CInputGroup className="mb-3">
                     <CInputGroupText>
                       <CIcon icon={cilLockLocked} />
@@ -119,10 +172,17 @@ const Register = () => {
                       required
                     />
                   </CInputGroup>
-                  <div className="d-grid">
+                  <div className="d-grid mb-3">
                     <CButton color="success" type="submit">
                       Create Account
                     </CButton>
+                  </div>
+                  <div className="d-grid">
+                    <Link to="/login" style={{ textDecoration: 'none' }}>
+                      <CButton color="primary" className="w-100">
+                        Back to Login
+                      </CButton>
+                    </Link>
                   </div>
                 </CForm>
               </CCardBody>

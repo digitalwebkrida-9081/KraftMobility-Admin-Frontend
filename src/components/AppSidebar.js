@@ -44,11 +44,11 @@ const AppSidebar = () => {
             to: '/users/approvals',
             className: pendingCount > 0 ? 'highlight-nav-item-red' : 'highlight-nav-item',
           },
-          {
-            component: CNavItem,
-            name: 'Create User',
-            to: '/users/create',
-          },
+          // {
+          //   component: CNavItem,
+          //   name: 'Create User',
+          //   to: '/users/create',
+          // },
           {
             component: CNavItem,
             name: 'All Users',

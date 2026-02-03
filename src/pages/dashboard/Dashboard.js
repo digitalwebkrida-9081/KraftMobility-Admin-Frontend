@@ -53,8 +53,10 @@ import avatar6 from 'src/assets/images/avatars/6.jpg'
 import WidgetsBrand from '../widgets/WidgetsBrand'
 import WidgetsDropdown from '../widgets/WidgetsDropdown'
 import MainChart from './MainChart'
+import { useAuth } from '../../context/AuthContext'
 
 const Dashboard = () => {
+  const { user } = useAuth()
   const progressExample = [
     { title: 'Visits', value: '29.703 Users', percent: 40, color: 'success' },
     { title: 'Unique', value: '24.093 Users', percent: 20, color: 'info' },
@@ -178,7 +180,8 @@ const Dashboard = () => {
 
   return (
     <>
-      <WidgetsDropdown className="mb-4" />
+      {user?.role === 'Admin' && <WidgetsDropdown className="mb-4" />}
+
       {/* <CCard className="mb-4">
         <CCardBody>
           <CRow>

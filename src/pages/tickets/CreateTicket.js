@@ -18,7 +18,7 @@ import { useEffect } from 'react'
 import { toast } from 'react-toastify'
 
 const CreateTicket = () => {
-  const [service, setService] = useState('Visa Renewal')
+  const [service, setService] = useState('Plumbing')
   const [description, setDescription] = useState('')
   const [image, setImage] = useState(null)
   const navigate = useNavigate()
@@ -40,6 +40,11 @@ const CreateTicket = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!description || description.trim().length < 10) {
+      toast.error('Description must be at least 10 characters long.')
+      return
+    }
 
     try {
       await TicketService.createTicket(service, description, image)
@@ -69,13 +74,7 @@ const CreateTicket = () => {
                   label="Select Service"
                   value={service}
                   onChange={(e) => setService(e.target.value)}
-                  options={[
-                    'Visa Renewal',
-                    'Household',
-                    'Furniture Service',
-                    'Maintenance',
-                    'Other',
-                  ]}
+                  options={['Plumbing', 'Electrical', 'Carpentry', 'Gas', 'Others']}
                 />
               </div>
               <div className="mb-3">
