@@ -22,7 +22,7 @@ const Register = () => {
   const [username, setUsername] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [phoneNumber, setPhoneNumber] = React.useState('')
-  const [location, setLocation] = React.useState('Bangalore')
+  const [location, setLocation] = React.useState('')
   const [propertyAddress, setPropertyAddress] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [repeatPassword, setRepeatPassword] = React.useState('')
@@ -123,15 +123,17 @@ const Register = () => {
                       aria-label="Location Select"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
+                      required
                       options={[
-                        'Bangalore',
-                        'Ahmedabad',
-                        'Guwahati',
-                        'Mumbai',
-                        'Pune',
-                        'Chennai',
-                        'Hyderabad',
-                        'Gurgaon',
+                        { label: 'Select Location', value: '' },
+                        { label: 'Bangalore', value: 'Bangalore' },
+                        { label: 'Ahmedabad', value: 'Ahmedabad' },
+                        { label: 'Guwahati', value: 'Guwahati' },
+                        { label: 'Mumbai', value: 'Mumbai' },
+                        { label: 'Pune', value: 'Pune' },
+                        { label: 'Chennai', value: 'Chennai' },
+                        { label: 'Hyderabad', value: 'Hyderabad' },
+                        { label: 'Gurgaon', value: 'Gurgaon' },
                       ]}
                     />
                   </div>

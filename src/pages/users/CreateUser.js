@@ -24,7 +24,7 @@ const CreateUser = () => {
     phoneNumber: '',
     password: '',
     role: 'End-User', // Default role
-    location: 'Bangalore',
+    location: '',
     propertyAddress: '',
   })
   const [error, setError] = useState('')
@@ -42,7 +42,7 @@ const CreateUser = () => {
               phoneNumber: user.phoneNumber || '',
               password: '', // Don't populate password
               role: user.role,
-              location: user.location || 'Bangalore',
+              location: user.location || '',
               propertyAddress: user.propertyAddress || '',
             })
           }
@@ -131,6 +131,7 @@ const CreateUser = () => {
                   label="Phone Number"
                   value={formData.phoneNumber}
                   onChange={handleChange}
+                  required
                 />
               </div>
 
@@ -141,7 +142,9 @@ const CreateUser = () => {
                   label="Location"
                   value={formData.location}
                   onChange={handleChange}
+                  required
                 >
+                  <option value="">Select Location</option>
                   <option value="Bangalore">Bangalore</option>
                   <option value="Ahmedabad">Ahmedabad</option>
                   <option value="Guwahati">Guwahati</option>
@@ -161,6 +164,7 @@ const CreateUser = () => {
                   rows={2}
                   value={formData.propertyAddress}
                   onChange={handleChange}
+                  required
                 />
               </div>
 
