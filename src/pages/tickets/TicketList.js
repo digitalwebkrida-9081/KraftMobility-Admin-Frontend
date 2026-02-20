@@ -23,10 +23,13 @@ import {
   CFormTextarea,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPencil, cilTrash, cilClock, cilImage } from '@coreui/icons'
+import { cilPencil, cilTrash, cilClock, cilImage, cilStar } from '@coreui/icons'
 import TicketService from '../../services/ticketService'
 import { authService } from '../../services/authService'
 import UserService from '../../services/userService'
+import RatingModal from '../../components/RatingModal'
+import RatingService from '../../services/ratingService'
+import { hasPermission } from '../../utils/rolePermissions'
 
 const MySwal = withReactContent(Swal)
 
@@ -55,6 +58,11 @@ const TicketList = () => {
   // Image Modal State
   const [imageModalVisible, setImageModalVisible] = useState(false)
   const [currentImageUrl, setCurrentImageUrl] = useState('')
+
+  // Rating Modal State
+  const [ratingModalVisible, setRatingModalVisible] = useState(false)
+  const [ratingTicketId, setRatingTicketId] = useState(null)
+  const [ratedTicketIds, setRatedTicketIds] = useState(new Set())
 
   useEffect(() => {
     retrieveTickets()
@@ -88,6 +96,12 @@ const TicketList = () => {
     TicketService.getTickets()
       .then((response) => {
         setTickets(response.data)
+        // Check for rated tickets (This is a basic implementation, ideally backend should send this info)
+        // For now, we will just keep track of what we rate in this session or we could fetch all ratings
+        // A better approach would be to have 'isRated' on the ticket object from backend.
+        // For this iteration, we will just depend on the button action or maybe fetch ratings strictly for completed tickets if needed.
+        // Let's trying fetching ratings for completed tickets to update UI
+        checkRatedTickets(response.data)
       })
       .catch((e) => {
         console.log(e)
@@ -280,6 +294,51 @@ const TicketList = () => {
     setCurrentImageUrl(fullUrl)
     setImageModalVisible(true)
   }
+
+  // --- Rating Logic ---
+  const checkRatedTickets = async (tickets) => {
+    if (!tickets) return
+    const completedTickets = tickets.filter(
+      (t) => t.status === 'Completed' && String(t.userId) === String(currentUserId),
+    )
+
+    // This could be heavy if many completed tickets, but for now it ensures correctness
+    const ratedIds = new Set()
+    for (const ticket of completedTickets) {
+      try {
+        const res = await RatingService.getRatingByTicketId(ticket.id)
+        if (res.data) {
+          ratedIds.add(ticket.id)
+        }
+      } catch (e) {
+        console.error('Error checking rating', e)
+      }
+    }
+    setRatedTicketIds(ratedIds)
+  }
+
+  const openRatingModal = (ticketId) => {
+    setRatingTicketId(ticketId)
+    setRatingModalVisible(true)
+  }
+
+  const handleRatingSubmit = (ticketId, rating, feedback) => {
+    RatingService.createRating(ticketId, rating, feedback)
+      .then(() => {
+        setRatingModalVisible(false)
+        toast.success('Thank you for your rating!')
+        setRatedTicketIds((prev) => new Set(prev).add(ticketId)) // Update local state
+      })
+      .catch((e) => {
+        console.error(e)
+        if (e.response && e.response.data && e.response.data.message) {
+          toast.error(e.response.data.message)
+        } else {
+          toast.error('Failed to submit rating')
+        }
+      })
+  }
+
   // -------------------
 
   return (
@@ -406,6 +465,33 @@ const TicketList = () => {
                         <CIcon icon={cilTrash} />
                       </CButton>
                     )}
+
+                    {/* Rating Button - Only for Completed tickets and Owner */}
+                    {(() => {
+                      const isCompleted = ticket.status === 'Completed'
+                      const isOwner = String(ticket.userId) === String(currentUserId)
+                      const isNotRated = !ratedTicketIds.has(ticket.id)
+                      const canRate = hasPermission(userRole, 'canRateTicket')
+                      return isCompleted && isOwner && isNotRated && canRate ? (
+                        <CButton
+                          color="warning"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openRatingModal(ticket.id)}
+                          title="Rate Service"
+                        >
+                          <CIcon icon={cilStar} /> Rate
+                        </CButton>
+                      ) : null
+                    })()}
+
+                    {ticket.status === 'Completed' &&
+                      String(ticket.userId) === String(currentUserId) &&
+                      ratedTicketIds.has(ticket.id) && (
+                        <CButton color="success" variant="ghost" size="sm" disabled title="Rated">
+                          <CIcon icon={cilStar} /> Rated
+                        </CButton>
+                      )}
                   </div>
                 </div>
               </CCardFooter>
@@ -555,6 +641,13 @@ const TicketList = () => {
           />
         </CModalBody>
       </CModal>
+
+      <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        onSubmit={handleRatingSubmit}
+        ticketId={ratingTicketId}
+      />
     </>
   )
 }

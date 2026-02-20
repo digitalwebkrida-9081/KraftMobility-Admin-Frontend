@@ -20,7 +20,7 @@ import logo from 'src/assets/brand/logo.png'
 import { sygnet } from 'src/assets/brand/sygnet'
 
 // sidebar nav config
-import navigation from '../config/nav'
+import { getFilteredNav } from '../config/nav'
 
 const AppSidebar = () => {
   const dispatch = useDispatch()
@@ -28,7 +28,9 @@ const AppSidebar = () => {
   const sidebarShow = useSelector((state) => state.sidebarShow)
   const { user, pendingCount } = useAuth()
 
-  const navItems = [...navigation]
+  // Get filtered navigation based on user role
+  const baseNavItems = user?.role ? getFilteredNav(user.role) : []
+  const navItems = [...baseNavItems]
   if (user?.role === 'Admin') {
     // Check if added to avoid duplicates if re-rendering (though clone prevents it, good to be safe id strict mode)
     if (!navItems.find((item) => item.name === 'Users')) {

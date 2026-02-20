@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
+import { getPermissions } from '../utils/rolePermissions'
 
 export const authService = {
   login: async (email, password) => {
@@ -18,9 +19,10 @@ export const authService = {
     const data = await response.json()
     if (data.token) {
       localStorage.setItem('user', JSON.stringify(data))
-      if (data.permissions) {
-        localStorage.setItem('permissions', JSON.stringify(data.permissions))
-      }
+      // Permissions are now derived from file, no need to store
+      // if (data.permissions) {
+      //   localStorage.setItem('permissions', JSON.stringify(data.permissions))
+      // }
     }
     return data.user
   },
@@ -44,13 +46,17 @@ export const authService = {
 
   logout: () => {
     localStorage.removeItem('user')
-    localStorage.removeItem('permissions')
+    localStorage.removeItem('permissions') // Clean up old data
   },
 
   getPermissions: () => {
-    const permStr = localStorage.getItem('permissions')
-    if (permStr) {
-      return JSON.parse(permStr)
+    // Should get from rolePermissions file based on current user role
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr).user
+      if (user && user.role) {
+        return getPermissions(user.role)
+      }
     }
     return {}
   },
