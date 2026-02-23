@@ -77,9 +77,13 @@ export const authService = {
     return null
   },
 
-  getUsers: async () => {
+  getUsers: async (page, limit) => {
     const token = authService.getToken()
-    const response = await fetch(`${API_URL}/users`, {
+    let url = `${API_URL}/users`
+    if (page && limit) {
+      url += `?page=${page}&limit=${limit}`
+    }
+    const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

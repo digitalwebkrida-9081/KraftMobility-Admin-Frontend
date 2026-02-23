@@ -26,6 +26,7 @@ import {
   CNavLink,
   CTabContent,
   CTabPane,
+  CButtonGroup,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import {
@@ -33,6 +34,7 @@ import {
   cilClock,
   cilWarning,
   cilList,
+  cilGrid,
   cilImage,
   cilDescription,
   cilPencil,
@@ -76,8 +78,27 @@ const TicketAnalytics = () => {
     others: 0,
   })
 
+  const [analyticsInsights, setAnalyticsInsights] = useState({
+    responseRate: 0,
+    respondedTickets: 0,
+    extendedCount: 0,
+    avgResolutionTime: 0,
+    unassignedCount: 0,
+    sortedServices: [],
+    expiringSoon: 0,
+    overdueCount: 0,
+    serviceHealth: [],
+  })
+
+  const [assignmentDist, setAssignmentDist] = useState({
+    assigned: 0,
+    unassigned: 0,
+    completed: 0,
+  })
+
   // Filter State
   const [filterStatus, setFilterStatus] = useState('All')
+  const [viewMode, setViewMode] = useState('grid')
 
   const filteredTickets =
     filterStatus === 'All' ? tickets : tickets.filter((t) => t.status === filterStatus)
@@ -144,28 +165,16 @@ const TicketAnalytics = () => {
     const fetchTickets = async () => {
       try {
         const response = await TicketService.getTickets()
-        const data = response.data
+        const data = response.data.data || response.data
         setTickets(data)
 
-        // Calculate Stats
-        // Calculate Stats (Case Insensitive & Comprehensive)
-        const pendingCount = data.filter((t) => t.status?.toLowerCase() === 'pending').length
-        const inProgressCount = data.filter(
-          (t) =>
-            t.status?.toLowerCase() === 'in progress' || t.status?.toLowerCase() === 'inprogress',
-        ).length
-        const completedCount = data.filter((t) => t.status?.toLowerCase() === 'completed').length
-        const othersCount = data.length - (pendingCount + inProgressCount + completedCount)
+        const analyticsRes = await TicketService.getAnalytics()
+        const { stats: fetchedStats, insights, assignmentDist: dist } = analyticsRes.data
 
-        const counts = {
-          total: data.length,
-          pending: pendingCount,
-          inProgress: inProgressCount,
-          completed: completedCount,
-          others: othersCount,
-        }
-        setStats(counts)
-        // Check which completed tickets are already rated
+        setStats(fetchedStats)
+        setAnalyticsInsights({ ...insights, serviceHealth: insights.serviceHealth || [] })
+        setAssignmentDist(dist)
+
         checkRatedTickets(data)
       } catch (error) {
         console.error('Error fetching tickets for dashboard', error)
@@ -266,21 +275,7 @@ const TicketAnalytics = () => {
   const handleStatusChange = (id, newStatus) => {
     TicketService.updateTicketStatus(id, newStatus)
       .then(() => {
-        // Refresh tickets
-        const fetchTickets = async () => {
-          const response = await TicketService.getTickets()
-          setTickets(response.data)
-          // Re-calc stats locally for speed
-          const data = response.data
-          const counts = {
-            total: data.length,
-            pending: data.filter((t) => t.status === 'Pending').length,
-            inProgress: data.filter((t) => t.status === 'In Progress').length,
-            completed: data.filter((t) => t.status === 'Completed').length,
-          }
-          setStats(counts)
-        }
-        fetchTickets()
+        retrieveTickets(false)
         toast.success(`Ticket status updated to ${newStatus}`)
       })
       .catch((e) => {
@@ -291,30 +286,21 @@ const TicketAnalytics = () => {
   const retrieveTickets = async (showSuccessMessage = false) => {
     try {
       const response = await TicketService.getTickets()
-      const data = response.data
+      const data = response.data.data || response.data
       setTickets(data)
 
-      // Calculate Stats (Case Insensitive & Comprehensive)
-      const pendingCount = data.filter((t) => t.status?.toLowerCase() === 'pending').length
-      const inProgressCount = data.filter(
-        (t) =>
-          t.status?.toLowerCase() === 'in progress' || t.status?.toLowerCase() === 'inprogress',
-      ).length
-      const completedCount = data.filter((t) => t.status?.toLowerCase() === 'completed').length
-      const othersCount = data.length - (pendingCount + inProgressCount + completedCount)
+      const analyticsRes = await TicketService.getAnalytics()
+      const { stats: fetchedStats, insights, assignmentDist: dist } = analyticsRes.data
 
-      const counts = {
-        total: data.length,
-        pending: pendingCount,
-        inProgress: inProgressCount,
-        completed: completedCount,
-        others: othersCount,
-      }
-      setStats(counts)
+      setStats(fetchedStats)
+      setAnalyticsInsights({ ...insights, serviceHealth: insights.serviceHealth || [] })
+      setAssignmentDist(dist)
+
+      checkRatedTickets(data)
+
       if (showSuccessMessage) {
         toast.success('Dashboard data refreshed successfully')
       }
-      checkRatedTickets(data)
     } catch (error) {
       console.error('Error fetching tickets', error)
       toast.error('Failed to refresh data')
@@ -323,39 +309,22 @@ const TicketAnalytics = () => {
 
   const checkRatedTickets = async (ticketsToCheck) => {
     const user = authService.getCurrentUser()
-    if (!user) return
+    if (!user || !ticketsToCheck || ticketsToCheck.length === 0) return
 
     const completedTickets = ticketsToCheck.filter(
       (t) => t.status === 'Completed' && String(t.userId) === String(user.id),
     )
 
-    // Optimization: If no completed tickets, skip
     if (completedTickets.length === 0) return
 
-    const newRatedTicketIds = new Set(ratedTicketIds)
-    let hasChanges = false
-
-    // We need to check each completed ticket.
-    // Ideally backend should return "isRated" flag, but for now we fetch.
-    // To avoid N requests, we might want a "getRatingsForUser" endpoint later.
-    // For now, parallel requests.
     try {
-      const checks = await Promise.allSettled(
-        completedTickets.map((t) => RatingService.getRatingByTicketId(t.id)),
-      )
-
-      checks.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value && result.value.data) {
-          newRatedTicketIds.add(String(completedTickets[index].id))
-          hasChanges = true
-        }
-      })
-
-      if (hasChanges || newRatedTicketIds.size !== ratedTicketIds.size) {
-        setRatedTicketIds(newRatedTicketIds)
+      const ticketIds = completedTickets.map((t) => t.id)
+      const res = await RatingService.checkRatedTicketsBatch(ticketIds)
+      if (res.data) {
+        setRatedTicketIds(new Set(res.data))
       }
     } catch (err) {
-      console.error('Error checking rated tickets', err)
+      console.error('Error checking rated tickets batch', err)
     }
   }
 
@@ -546,115 +515,33 @@ const TicketAnalytics = () => {
       })
   }
 
-  // Advanced Analytics Calculations
-  const getAnalyticsInsights = () => {
-    // Response Rate - Tickets with Admin/Operator notes
-    const respondedTickets = tickets.filter(
-      (t) => t.notes && t.notes.some((n) => n.author === 'Admin' || n.author === 'Operator'),
-    ).length
-    const responseRate =
-      tickets.length > 0 ? Math.round((respondedTickets / tickets.length) * 100) : 0
-
-    // Extended Tickets
-    const extendedCount = tickets.filter((t) => {
-      const created = new Date(t.createdAt)
-      const expires = new Date(t.expiresAt)
-      const diffDays = Math.ceil(Math.abs(expires - created) / (1000 * 60 * 60 * 24))
-      return diffDays > 9
-    }).length
-
-    // Average Resolution Time (for completed tickets)
-    const completedTickets = tickets.filter((t) => t.status?.toLowerCase() === 'completed')
-    let avgResolutionTime = 0
-    if (completedTickets.length > 0) {
-      const totalHours = completedTickets.reduce((sum, t) => {
-        const created = new Date(t.createdAt)
-        const updated = new Date(t.updatedAt)
-        return sum + Math.abs(updated - created) / (1000 * 60 * 60)
-      }, 0)
-      avgResolutionTime = Math.round(totalHours / completedTickets.length)
-    }
-
-    // Unassigned Tickets
-    const unassignedCount = tickets.filter(
-      (t) => !t.assignedTo && t.status?.toLowerCase() !== 'completed',
-    ).length
-
-    // Top Services with counts
-    const serviceCount = {}
-    tickets.forEach((t) => {
-      const service = t.service || 'Other'
-      serviceCount[service] = (serviceCount[service] || 0) + 1
-    })
-    const sortedServices = Object.entries(serviceCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-
-    // Expiring Soon (within 3 days)
-    const now = new Date()
-    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
-    const expiringSoon = tickets.filter((t) => {
-      if (t.status?.toLowerCase() === 'completed') return false
-      const expires = new Date(t.expiresAt)
-      return expires <= threeDaysFromNow && expires >= now
-    }).length
-
-    // Overdue Tickets
-    const overdueCount = tickets.filter((t) => {
-      if (t.status?.toLowerCase() === 'completed') return false
-      return new Date(t.expiresAt) < now
-    }).length
-
-    return {
-      responseRate,
-      respondedTickets,
-      extendedCount,
-      avgResolutionTime,
-      unassignedCount,
-      sortedServices,
-      expiringSoon,
-      overdueCount,
-    }
-  }
-  const analyticsInsights = getAnalyticsInsights()
+  // Advanced Analytics data is fetched directly from backend APIs and stored in state
 
   // Chart Data Preparation - Service Health Matrix (Stacked Bar)
   const getServiceHealthData = () => {
-    const serviceMap = {}
-    tickets.forEach((t) => {
-      const s = t.service || 'Other'
-      if (!serviceMap[s]) serviceMap[s] = { Pending: 0, 'In Progress': 0, Completed: 0 }
-      const status =
-        t.status === 'Completed'
-          ? 'Completed'
-          : t.status === 'In Progress'
-            ? 'In Progress'
-            : 'Pending'
-      serviceMap[s][status]++
-    })
-
-    const labels = Object.keys(serviceMap)
+    const serviceHealth = analyticsInsights.serviceHealth || []
+    const labels = serviceHealth.map((s) => s._id || 'Other')
     return {
       labels,
       datasets: [
         {
           label: 'Pending',
           backgroundColor: '#ef4444',
-          data: labels.map((l) => serviceMap[l].Pending),
+          data: serviceHealth.map((l) => l.pending || 0),
           barPercentage: 0.6,
           borderRadius: 4,
         },
         {
           label: 'In Progress',
           backgroundColor: '#f59e0b',
-          data: labels.map((l) => serviceMap[l]['In Progress']),
+          data: serviceHealth.map((l) => l.inProgress || 0),
           barPercentage: 0.6,
           borderRadius: 4,
         },
         {
           label: 'Completed',
           backgroundColor: '#10b981',
-          data: labels.map((l) => serviceMap[l].Completed),
+          data: serviceHealth.map((l) => l.completed || 0),
           barPercentage: 0.6,
           borderRadius: 4,
         },
@@ -665,14 +552,6 @@ const TicketAnalytics = () => {
 
   // Chart Data - Assignment Distribution (Doughnut)
   const getAssignmentData = () => {
-    const assigned = tickets.filter(
-      (t) => t.assignedTo && t.status?.toLowerCase() !== 'completed',
-    ).length
-    const unassigned = tickets.filter(
-      (t) => !t.assignedTo && t.status?.toLowerCase() !== 'completed',
-    ).length
-    const completed = tickets.filter((t) => t.status?.toLowerCase() === 'completed').length
-
     return {
       labels: ['Assigned', 'Unassigned', 'Completed'],
       datasets: [
@@ -680,7 +559,11 @@ const TicketAnalytics = () => {
           backgroundColor: ['#3b82f6', '#f87171', '#10b981'],
           borderWidth: 0,
           hoverOffset: 8,
-          data: [assigned, unassigned, completed],
+          data: [
+            assignmentDist.assigned || 0,
+            assignmentDist.unassigned || 0,
+            assignmentDist.completed || 0,
+          ],
         },
       ],
     }
@@ -760,8 +643,8 @@ const TicketAnalytics = () => {
 
   // Chart Data - Response Analysis (Doughnut)
   const getResponseData = () => {
-    const responded = analyticsInsights.respondedTickets
-    const notResponded = stats.total - responded
+    const responded = analyticsInsights.respondedTickets || 0
+    const notResponded = (stats.total || 0) - responded
 
     return {
       labels: ['Responded', 'Awaiting Response'],
@@ -1755,280 +1638,649 @@ const TicketAnalytics = () => {
                   Detailed view of all system tickets and status.
                 </p>
               </div>
-              <CButton
-                color="primary"
-                className="d-flex align-items-center gap-2 rounded-pill px-4"
-                onClick={() => retrieveTickets(true)}
-              >
-                <CIcon icon={cilTask} /> Refresh Data
-              </CButton>
+              <div className="d-flex align-items-center gap-3">
+                <CButtonGroup role="group" aria-label="View Mode">
+                  <CButton
+                    color={viewMode === 'list' ? 'primary' : 'secondary'}
+                    variant={viewMode === 'list' ? '' : 'outline'}
+                    onClick={() => setViewMode('list')}
+                  >
+                    <CIcon icon={cilList} />
+                  </CButton>
+                  <CButton
+                    color={viewMode === 'grid' ? 'primary' : 'secondary'}
+                    variant={viewMode === 'grid' ? '' : 'outline'}
+                    onClick={() => setViewMode('grid')}
+                  >
+                    <CIcon icon={cilGrid} />
+                  </CButton>
+                </CButtonGroup>
+                <CButton
+                  color="primary"
+                  className="d-flex align-items-center gap-2 rounded-pill px-4"
+                  onClick={() => retrieveTickets(true)}
+                >
+                  <CIcon icon={cilTask} /> Refresh Data
+                </CButton>
+              </div>
             </div>
 
             <div>
-              <table className="ticket-table align-middle">
-                <thead>
-                  <tr>
-                    <th style={{ paddingLeft: '1.5rem' }}>Ticket & Service</th>
-                    <th>Created By</th>
-                    <th>Assigned Operator</th>
-                    <th>Status</th>
-                    <th>Timeline</th>
-                    <th className="text-center">Details</th>
-                    <th className="text-end" style={{ paddingRight: '1.5rem' }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTickets.map((item, index) => (
-                    <tr key={index}>
-                      <td style={{ paddingLeft: '1.5rem' }}>
-                        <div className="d-flex align-items-center">
-                          <div className="ticket-service-icon">
-                            <CIcon icon={getServiceIcon(item.service)} />
-                          </div>
-                          <div>
-                            {/* removed text-dark to allow inheritance */}
-                            <div className="fw-bold">{item.service}</div>
-                            <div className="small opacity-75">ID: #{item.id}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <div
-                            className="avatar-circle me-2"
-                            style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}
-                          >
-                            {getInitials(item.userEmail)}
-                          </div>
-                          <div>
-                            <div
-                              className="fw-semibold text-truncate"
-                              style={{ maxWidth: '150px' }}
-                              title={item.userEmail}
-                            >
-                              {item.userEmail}
+              {viewMode === 'list' ? (
+                <table className="ticket-table align-middle">
+                  <thead>
+                    <tr>
+                      <th style={{ paddingLeft: '1.5rem' }}>Ticket & Service</th>
+                      <th>Created By</th>
+                      <th>Assigned Operator</th>
+                      <th>Status</th>
+                      <th>Timeline</th>
+                      <th className="text-center">Details</th>
+                      <th className="text-end" style={{ paddingRight: '1.5rem' }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTickets.map((item, index) => (
+                      <tr key={index}>
+                        <td style={{ paddingLeft: '1.5rem' }}>
+                          <div className="d-flex align-items-center">
+                            <div className="ticket-service-icon">
+                              <CIcon icon={getServiceIcon(item.service)} />
                             </div>
-                            <div className="small opacity-75">
-                              {new Date(item.createdAt).toLocaleDateString()}
+                            <div>
+                              {/* removed text-dark to allow inheritance */}
+                              <div className="fw-bold">{item.service}</div>
+                              <div className="small opacity-75">ID: #{item.id}</div>
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      <td>
-                        {item.assignedToName ? (
+                        <td>
                           <div className="d-flex align-items-center">
                             <div
                               className="avatar-circle me-2"
+                              style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}
+                            >
+                              {getInitials(item.userEmail)}
+                            </div>
+                            <div>
+                              <div
+                                className="fw-semibold text-truncate"
+                                style={{ maxWidth: '150px' }}
+                                title={item.userEmail}
+                              >
+                                {item.userEmail}
+                              </div>
+                              <div className="small opacity-75">
+                                {new Date(item.createdAt).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td>
+                          {item.assignedToName ? (
+                            <div className="d-flex align-items-center">
+                              <div
+                                className="avatar-circle me-2"
+                                style={{
+                                  background: 'linear-gradient(135deg, #17ead9 0%, #6078ea 100%)',
+                                  width: '28px',
+                                  height: '28px',
+                                }}
+                              >
+                                {getInitials(item.assignedToName)}
+                              </div>
+                              {/* removed text-dark */}
+                              <span className="fw-medium">{item.assignedToName}</span>
+                            </div>
+                          ) : (
+                            <span className="badge bg-secondary bg-opacity-10 text-secondary fw-normal px-3 py-1 rounded-pill">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          <CDropdown>
+                            <CDropdownToggle
+                              caret={false}
+                              className={`border-0 p-0 badge-pill ${getBadgeClass(item.status)} text-decoration-none`}
+                              disabled={
+                                !(
+                                  userRole === 'Admin' ||
+                                  authService.getPermissions()['tickets']?.includes('action')
+                                )
+                              }
                               style={{
-                                background: 'linear-gradient(135deg, #17ead9 0%, #6078ea 100%)',
-                                width: '28px',
-                                height: '28px',
+                                cursor:
+                                  userRole === 'Admin' ||
+                                  authService.getPermissions()['tickets']?.includes('action')
+                                    ? 'pointer'
+                                    : 'default',
                               }}
                             >
-                              {getInitials(item.assignedToName)}
-                            </div>
-                            {/* removed text-dark */}
-                            <span className="fw-medium">{item.assignedToName}</span>
-                          </div>
-                        ) : (
-                          <span className="badge bg-secondary bg-opacity-10 text-secondary fw-normal px-3 py-1 rounded-pill">
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
+                              {item.status}
+                            </CDropdownToggle>
+                            {(userRole === 'Admin' ||
+                              authService.getPermissions()['tickets']?.includes('action')) && (
+                              <CDropdownMenu>
+                                <CDropdownItem
+                                  onClick={() => handleStatusChange(item.id, 'Pending')}
+                                >
+                                  Pending
+                                </CDropdownItem>
+                                <CDropdownItem
+                                  onClick={() => handleStatusChange(item.id, 'In Progress')}
+                                >
+                                  In Progress
+                                </CDropdownItem>
+                                <CDropdownItem
+                                  onClick={() => handleStatusChange(item.id, 'Completed')}
+                                >
+                                  Completed
+                                </CDropdownItem>
+                              </CDropdownMenu>
+                            )}
+                          </CDropdown>
+                        </td>
 
-                      <td>
-                        <CDropdown>
-                          <CDropdownToggle
-                            caret={false}
-                            className={`border-0 p-0 badge-pill ${getBadgeClass(item.status)} text-decoration-none`}
-                            disabled={
-                              !(
-                                userRole === 'Admin' ||
-                                authService.getPermissions()['tickets']?.includes('action')
-                              )
-                            }
-                            style={{
-                              cursor:
-                                userRole === 'Admin' ||
-                                authService.getPermissions()['tickets']?.includes('action')
-                                  ? 'pointer'
-                                  : 'default',
-                            }}
-                          >
-                            {item.status}
-                          </CDropdownToggle>
-                          {(userRole === 'Admin' ||
-                            authService.getPermissions()['tickets']?.includes('action')) && (
-                            <CDropdownMenu>
-                              <CDropdownItem onClick={() => handleStatusChange(item.id, 'Pending')}>
-                                Pending
-                              </CDropdownItem>
-                              <CDropdownItem
-                                onClick={() => handleStatusChange(item.id, 'In Progress')}
-                              >
-                                In Progress
-                              </CDropdownItem>
-                              <CDropdownItem
-                                onClick={() => handleStatusChange(item.id, 'Completed')}
-                              >
-                                Completed
-                              </CDropdownItem>
-                            </CDropdownMenu>
-                          )}
-                        </CDropdown>
-                      </td>
-
-                      <td>
-                        <CButton
-                          color="primary"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDetailsModal(item)}
-                        >
-                          Read More
-                        </CButton>
-                      </td>
-
-                      <td className="text-center">
-                        <div className="d-flex justify-content-center gap-2">
+                        <td>
                           <CButton
-                            color="info"
+                            color="primary"
                             variant="ghost"
                             size="sm"
-                            onClick={() => openContentModal(item)}
-                            title="View Details"
+                            onClick={() => openDetailsModal(item)}
                           >
-                            <CIcon icon={cilDescription} className="me-1" />
-                            View Details
+                            Read More
                           </CButton>
+                        </td>
 
-                          {/* Rating Button */}
-                          {(() => {
-                            const isCompleted = item.status === 'Completed'
-                            const isOwner = String(item.userId) === String(currentUserId)
-                            // Ensure stringent ID check
-                            const isNotRated = !ratedTicketIds.has(String(item.id))
-                            const canRate = hasPermission(userRole, 'canRateTicket')
+                        <td className="text-center">
+                          <div className="d-flex justify-content-center gap-2">
+                            <CButton
+                              color="info"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openContentModal(item)}
+                              title="View Details"
+                            >
+                              <CIcon icon={cilDescription} className="me-1" />
+                              View Details
+                            </CButton>
 
-                            // Debug log to console if needed
-                            // console.log(`ID:${item.id} C:${isCompleted} O:${isOwner} R:${isNotRated}`);
+                            {/* Rating Button */}
+                            {(() => {
+                              const isCompleted = item.status === 'Completed'
+                              const isOwner = String(item.userId) === String(currentUserId)
+                              // Ensure stringent ID check
+                              const isNotRated = !ratedTicketIds.has(String(item.id))
+                              const canRate = hasPermission(userRole, 'canRateTicket')
 
-                            if (isCompleted && isOwner && isNotRated && canRate) {
-                              return (
-                                <CButton
-                                  color="warning"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openRatingModal(item.id)}
-                                  title="Rate Service"
+                              // Debug log to console if needed
+                              // console.log(`ID:${item.id} C:${isCompleted} O:${isOwner} R:${isNotRated}`);
+
+                              if (isCompleted && isOwner && isNotRated && canRate) {
+                                return (
+                                  <CButton
+                                    color="warning"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openRatingModal(item.id)}
+                                    title="Rate Service"
+                                  >
+                                    <CIcon icon={cilStar} className="me-1" /> Rate
+                                  </CButton>
+                                )
+                              }
+                              return null
+                            })()}
+                          </div>
+                        </td>
+
+                        <td className="text-end" style={{ paddingRight: '1.5rem' }}>
+                          {/* Actions Dropdown */}
+                          <CDropdown alignment="end">
+                            <CDropdownToggle
+                              color="transparent"
+                              size="sm"
+                              className="btn-icon-soft text-secondary p-0 rotate-icon"
+                            >
+                              <CIcon icon={cilOptions} size="lg" className="rotate-90" />
+                            </CDropdownToggle>
+                            <CDropdownMenu>
+                              {(userRole === 'Admin' ||
+                                item.userId === currentUserId ||
+                                authService.getPermissions()['tickets']?.includes('delete')) && (
+                                <CDropdownItem
+                                  onClick={() => handleDelete(item.id)}
+                                  className="text-danger"
                                 >
-                                  <CIcon icon={cilStar} className="me-1" /> Rate
-                                </CButton>
-                              )
-                            }
-                            return null
-                          })()}
-                        </div>
-                      </td>
-
-                      <td className="text-end" style={{ paddingRight: '1.5rem' }}>
-                        {/* Actions Dropdown */}
-                        <CDropdown alignment="end">
-                          <CDropdownToggle
-                            color="transparent"
-                            size="sm"
-                            className="btn-icon-soft text-secondary p-0 rotate-icon"
-                          >
-                            <CIcon icon={cilOptions} size="lg" className="rotate-90" />
-                          </CDropdownToggle>
-                          <CDropdownMenu>
-                            {(userRole === 'Admin' ||
-                              item.userId === currentUserId ||
-                              authService.getPermissions()['tickets']?.includes('delete')) && (
-                              <CDropdownItem
-                                onClick={() => handleDelete(item.id)}
-                                className="text-danger"
-                              >
-                                <CIcon icon={cilTrash} className="me-2" /> Delete Ticket
-                              </CDropdownItem>
-                            )}
-                            {userRole === 'Admin' && (
-                              <CDropdownItem onClick={() => openAssignModal(item)}>
-                                <CIcon icon={cilUser} className="me-2" /> Assign Operator
-                              </CDropdownItem>
-                            )}
-                            {/* <CDropdownItem
+                                  <CIcon icon={cilTrash} className="me-2" /> Delete Ticket
+                                </CDropdownItem>
+                              )}
+                              {userRole === 'Admin' && (
+                                <CDropdownItem onClick={() => openAssignModal(item)}>
+                                  <CIcon icon={cilUser} className="me-2" /> Assign Operator
+                                </CDropdownItem>
+                              )}
+                              {/* <CDropdownItem
                           onClick={() => openContentModal(item)}
                           style={{ cursor: 'pointer' }}
                         >
                           <CIcon icon={cilDescription} className="me-2" /> View Details & Notes
                         </CDropdownItem> */}
-                            {String(item.userId) === String(currentUserId) && (
-                              <>
-                                <CDropdownItem
-                                  onClick={() => openEditModal(item)}
-                                  style={{ cursor: 'pointer' }}
+                              {String(item.userId) === String(currentUserId) && (
+                                <>
+                                  <CDropdownItem
+                                    onClick={() => openEditModal(item)}
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    <CIcon icon={cilPencil} className="me-2" /> Edit Ticket
+                                  </CDropdownItem>
+                                  <CDropdownItem
+                                    onClick={() => handleExtend(item.id)}
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    <CIcon icon={cilClock} className="me-2" /> Extend Expiry
+                                  </CDropdownItem>
+                                </>
+                              )}
+                            </CDropdownMenu>
+                          </CDropdown>
+                        </td>
+                      </tr>
+                    ))}
+                    {tickets.length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="text-center py-5 text-muted">
+                          <div className="mb-3">
+                            <CIcon icon={cilList} size="4xl" className="text-light-emphasis" />
+                          </div>
+                          No tickets found in the database.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <CRow className="g-4 p-4">
+                  {filteredTickets.map((item, index) => (
+                    <CCol xs={12} md={6} xl={4} key={index}>
+                      <CCard
+                        className="h-100 ticket-grid-card modern-card"
+                        style={{
+                          '--card-status-color':
+                            item.status === 'Pending'
+                              ? '#e55353'
+                              : item.status === 'In Progress'
+                                ? '#f9b115'
+                                : item.status === 'Completed'
+                                  ? '#2eb85c'
+                                  : '#3399ff',
+                          '--card-status-color-rgb':
+                            item.status === 'Pending'
+                              ? '229, 83, 83'
+                              : item.status === 'In Progress'
+                                ? '249, 177, 21'
+                                : item.status === 'Completed'
+                                  ? '46, 184, 92'
+                                  : '51, 153, 255',
+                        }}
+                        onClick={(e) => {
+                          const el = e.target
+                          if (
+                            el.closest('.dropdown') ||
+                            el.closest('.dropdown-menu') ||
+                            el.closest('button') ||
+                            el.closest('.btn')
+                          ) {
+                            return
+                          }
+                          openDetailsModal(item)
+                        }}
+                      >
+                        <CCardBody className="p-4 d-flex flex-column h-100">
+                          {/* Top Strip: ID, Date, Status */}
+                          <div className="d-flex justify-content-between align-items-start mb-3">
+                            <div className="d-flex flex-column gap-1">
+                              <span
+                                className="fw-bold text-dark"
+                                style={{ letterSpacing: '0.5px', fontSize: '1rem' }}
+                              >
+                                KRAFT-{item.id}
+                              </span>
+                              <span className="text-muted small">
+                                {new Date(item.createdAt).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Main Service Identifier */}
+                          <div className="mb-4">
+                            <div className="d-flex align-items-start gap-3 mb-2">
+                              <div
+                                className="service-icon-wrapper rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 mt-1"
+                                style={{ width: '42px', height: '42px' }}
+                              >
+                                <CIcon icon={getServiceIcon(item.service)} size="xl" />
+                              </div>
+                              <div>
+                                <h5
+                                  className="mb-1 fw-bold text-dark"
+                                  style={{ lineHeight: '1.3' }}
                                 >
-                                  <CIcon icon={cilPencil} className="me-2" /> Edit Ticket
-                                </CDropdownItem>
-                                <CDropdownItem
-                                  onClick={() => handleExtend(item.id)}
-                                  style={{ cursor: 'pointer' }}
+                                  {item.service}
+                                </h5>
+                                {item.description && (
+                                  <p
+                                    className="text-secondary small mb-0"
+                                    style={{
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: '2',
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Flexible spacer to push grid to bottom */}
+                          <div className="flex-grow-1"></div>
+
+                          {/* Actors Grid: Creator & Assignee */}
+                          <div className="row g-2 mb-4">
+                            <div className="col-6">
+                              <p
+                                className="text-uppercase text-muted mb-2"
+                                style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: '700',
+                                  letterSpacing: '0.5px',
+                                }}
+                              >
+                                Created By
+                              </p>
+                              <div className="d-flex align-items-center gap-2">
+                                <div
+                                  className="avatar-circle flex-shrink-0"
+                                  style={{ width: '26px', height: '26px', fontSize: '0.65rem' }}
                                 >
-                                  <CIcon icon={cilClock} className="me-2" /> Extend Expiry
-                                </CDropdownItem>
-                              </>
-                            )}
-                          </CDropdownMenu>
-                        </CDropdown>
-                      </td>
-                    </tr>
+                                  {getInitials(item.userEmail)}
+                                </div>
+                                <span
+                                  className="text-truncate small fw-medium text-dark"
+                                  title={item.userEmail}
+                                >
+                                  {item.userEmail.split('@')[0]}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="col-6 border-start ps-3">
+                              <p
+                                className="text-uppercase text-muted mb-2"
+                                style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: '700',
+                                  letterSpacing: '0.5px',
+                                }}
+                              >
+                                Assigned To
+                              </p>
+                              <div className="d-flex align-items-center gap-2">
+                                {item.assignedToName ? (
+                                  <>
+                                    <div
+                                      className="avatar-circle flex-shrink-0"
+                                      style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        fontSize: '0.65rem',
+                                        background:
+                                          'linear-gradient(135deg, #17ead9 0%, #6078ea 100%)',
+                                      }}
+                                    >
+                                      {getInitials(item.assignedToName)}
+                                    </div>
+                                    <span
+                                      className="text-truncate small fw-medium text-dark"
+                                      title={item.assignedToName}
+                                    >
+                                      {item.assignedToName}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="badge bg-secondary bg-opacity-10 text-secondary fw-normal px-2 py-1 rounded-pill small">
+                                    Unassigned
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Footer Actions Strip */}
+                          <div className="pt-3 border-top d-flex justify-content-between align-items-center mt-auto">
+                            <CButton
+                              color="primary"
+                              variant="ghost"
+                              size="sm"
+                              className="d-flex align-items-center gap-2 px-2 border-0"
+                              onClick={() => {
+                                openContentModal(item)
+                              }}
+                            >
+                              <span>View Details</span>
+                              <CIcon icon={cilDescription} size="sm" />
+                            </CButton>
+
+                            <div className="d-flex align-items-center gap-2">
+                              {(() => {
+                                const isCompleted = item.status === 'Completed'
+                                const isOwner = String(item.userId) === String(currentUserId)
+                                const isNotRated = !ratedTicketIds.has(String(item.id))
+                                const canRate = hasPermission(userRole, 'canRateTicket')
+
+                                if (isCompleted && isOwner && isNotRated && canRate) {
+                                  return (
+                                    <CButton
+                                      color="warning"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        openRatingModal(item.id)
+                                      }}
+                                      title="Rate Service"
+                                    >
+                                      <CIcon icon={cilStar} className="me-1" /> Rate
+                                    </CButton>
+                                  )
+                                }
+                                return null
+                              })()}
+
+                              {/* Dedicated Actionable Status Badge Dropdown */}
+                              {(() => {
+                                const canChangeStatus =
+                                  userRole === 'Admin' ||
+                                  authService.getPermissions()['tickets']?.includes('action')
+
+                                return canChangeStatus ? (
+                                  <CDropdown alignment="end" direction="up">
+                                    <CDropdownToggle
+                                      size="sm"
+                                      className="d-flex align-items-center gap-2 border-0"
+                                      style={{
+                                        backgroundColor: 'rgba(var(--card-status-color-rgb), 0.12)',
+                                        color: 'var(--card-status-color)',
+                                        fontWeight: '700',
+                                        borderRadius: '20px',
+                                        padding: '0.35rem 0.85rem',
+                                        fontSize: '0.75rem',
+                                        boxShadow: 'none',
+                                      }}
+                                    >
+                                      <span
+                                        className="d-inline-block rounded-circle"
+                                        style={{
+                                          width: '6px',
+                                          height: '6px',
+                                          backgroundColor: 'var(--card-status-color)',
+                                        }}
+                                      ></span>
+                                      {item.status}
+                                    </CDropdownToggle>
+                                    <CDropdownMenu>
+                                      <CDropdownItem
+                                        onClick={() => handleStatusChange(item.id, 'Pending')}
+                                        className="d-flex align-items-center gap-2"
+                                      >
+                                        <span
+                                          className="d-inline-block rounded-circle bg-danger"
+                                          style={{ width: '8px', height: '8px' }}
+                                        ></span>
+                                        <span className="fw-semibold text-dark">Pending</span>
+                                      </CDropdownItem>
+                                      <CDropdownItem
+                                        onClick={() => handleStatusChange(item.id, 'In Progress')}
+                                        className="d-flex align-items-center gap-2"
+                                      >
+                                        <span
+                                          className="d-inline-block rounded-circle bg-warning"
+                                          style={{ width: '8px', height: '8px' }}
+                                        ></span>
+                                        <span className="fw-semibold text-dark">In Progress</span>
+                                      </CDropdownItem>
+                                      <CDropdownItem
+                                        onClick={() => handleStatusChange(item.id, 'Completed')}
+                                        className="d-flex align-items-center gap-2"
+                                      >
+                                        <span
+                                          className="d-inline-block rounded-circle bg-success"
+                                          style={{ width: '8px', height: '8px' }}
+                                        ></span>
+                                        <span className="fw-semibold text-dark">Completed</span>
+                                      </CDropdownItem>
+                                    </CDropdownMenu>
+                                  </CDropdown>
+                                ) : (
+                                  <span
+                                    className="badge rounded-pill px-3 py-1"
+                                    style={{
+                                      color: 'var(--card-status-color)',
+                                      backgroundColor: 'rgba(var(--card-status-color-rgb), 0.1)',
+                                      fontWeight: '600',
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    <span
+                                      className="d-inline-block rounded-circle me-2"
+                                      style={{
+                                        width: '6px',
+                                        height: '6px',
+                                        backgroundColor: 'var(--card-status-color)',
+                                      }}
+                                    ></span>
+                                    {item.status}
+                                  </span>
+                                )
+                              })()}
+
+                              <CDropdown alignment="end">
+                                <CDropdownToggle
+                                  color="light"
+                                  size="sm"
+                                  className="btn-icon-soft text-secondary p-1"
+                                >
+                                  <CIcon icon={cilOptions} />
+                                </CDropdownToggle>
+                                <CDropdownMenu>
+                                  {(userRole === 'Admin' ||
+                                    item.userId === currentUserId ||
+                                    authService
+                                      .getPermissions()
+                                      ['tickets']?.includes('delete')) && (
+                                    <CDropdownItem
+                                      onClick={() => handleDelete(item.id)}
+                                      className="text-danger"
+                                    >
+                                      <CIcon icon={cilTrash} className="me-2" /> Delete
+                                    </CDropdownItem>
+                                  )}
+                                  {userRole === 'Admin' && (
+                                    <CDropdownItem onClick={() => openAssignModal(item)}>
+                                      <CIcon icon={cilUser} className="me-2" /> Assign Operator
+                                    </CDropdownItem>
+                                  )}
+                                  {String(item.userId) === String(currentUserId) && (
+                                    <>
+                                      <CDropdownItem
+                                        onClick={() => openEditModal(item)}
+                                        style={{ cursor: 'pointer' }}
+                                      >
+                                        <CIcon icon={cilPencil} className="me-2" /> Edit Ticket
+                                      </CDropdownItem>
+                                      <CDropdownItem
+                                        onClick={() => handleExtend(item.id)}
+                                        style={{ cursor: 'pointer' }}
+                                      >
+                                        <CIcon icon={cilClock} className="me-2" /> Extend Expiry
+                                      </CDropdownItem>
+                                    </>
+                                  )}
+                                </CDropdownMenu>
+                              </CDropdown>
+                            </div>
+                          </div>
+                        </CCardBody>
+                      </CCard>
+                    </CCol>
                   ))}
                   {tickets.length === 0 && (
-                    <tr>
-                      <td colSpan="7" className="text-center py-5 text-muted">
-                        <div className="mb-3">
-                          <CIcon icon={cilList} size="4xl" className="text-light-emphasis" />
-                        </div>
-                        No tickets found in the database.
-                      </td>
-                    </tr>
+                    <CCol xs={12} className="text-center py-5 text-muted">
+                      <div className="mb-3">
+                        <CIcon icon={cilGrid} size="4xl" className="text-light-emphasis" />
+                      </div>
+                      No tickets found in the database.
+                    </CCol>
                   )}
-                </tbody>
-              </table>
+                </CRow>
+              )}
             </div>
           </div>
         </CTabPane>
 
         {/* Review Analysis Tab */}
         <CTabPane role="tabpanel" aria-labelledby="reviews-tab" visible={activeKey === 'reviews'}>
-          <CCard className="mb-4 border-0 shadow-sm" style={{ background: '#1e2330' }}>
+          <CCard className="mb-4 border-0 shadow-sm">
             <CCardBody>
-              <h5 className="mb-4 text-white">Review Analysis Filters</h5>
+              <h5 className="mb-4">Review Analysis Filters</h5>
               <CRow className="g-3">
                 <CCol md={3}>
-                  <CFormLabel className="text-secondary small">City</CFormLabel>
+                  <CFormLabel className="small">City</CFormLabel>
                   <CFormInput
                     placeholder="Search by City"
                     value={reviewFilters.city}
                     onChange={(e) => setReviewFilters({ ...reviewFilters, city: e.target.value })}
-                    style={{ background: '#1a1f2e', color: '#fff', border: '1px solid #374151' }}
                   />
                 </CCol>
                 <CCol md={3}>
-                  <CFormLabel className="text-secondary small">Operator</CFormLabel>
+                  <CFormLabel className="small">Operator</CFormLabel>
                   <CFormSelect
                     aria-label="Filter by Operator"
                     value={reviewFilters.operator}
                     onChange={(e) =>
                       setReviewFilters({ ...reviewFilters, operator: e.target.value })
                     }
-                    style={{ background: '#1a1f2e', color: '#fff', border: '1px solid #374151' }}
                   >
                     <option value="">All Operators</option>
                     {operators.map((op) => (
@@ -2039,36 +2291,34 @@ const TicketAnalytics = () => {
                   </CFormSelect>
                 </CCol>
                 <CCol md={3}>
-                  <CFormLabel className="text-secondary small">Start Date</CFormLabel>
+                  <CFormLabel className="small">Start Date</CFormLabel>
                   <CFormInput
                     type="date"
                     value={reviewFilters.startDate}
                     onChange={(e) =>
                       setReviewFilters({ ...reviewFilters, startDate: e.target.value })
                     }
-                    style={{ background: '#1a1f2e', color: '#fff', border: '1px solid #374151' }}
                   />
                 </CCol>
                 <CCol md={3}>
-                  <CFormLabel className="text-secondary small">End Date</CFormLabel>
+                  <CFormLabel className="small">End Date</CFormLabel>
                   <CFormInput
                     type="date"
                     value={reviewFilters.endDate}
                     onChange={(e) =>
                       setReviewFilters({ ...reviewFilters, endDate: e.target.value })
                     }
-                    style={{ background: '#1a1f2e', color: '#fff', border: '1px solid #374151' }}
                   />
                 </CCol>
               </CRow>
             </CCardBody>
           </CCard>
 
-          <CCard className="border-0 shadow-sm" style={{ background: '#1e2330' }}>
+          <CCard className="border-0 shadow-sm">
             <CCardBody>
-              <h5 className="mb-4 text-white">Reviews ({filteredReviews.length})</h5>
+              <h5 className="mb-4">Reviews ({filteredReviews.length})</h5>
               <div className="table-responsive">
-                <table className="table table-dark table-hover align-middle">
+                <table className="table ticket-table table-hover align-middle">
                   <thead>
                     <tr>
                       <th>Ticket ID</th>
@@ -2131,7 +2381,7 @@ const TicketAnalytics = () => {
                           <td>
                             <div
                               className="text-truncate"
-                              style={{ maxWidth: '250px' }}
+                              style={{ maxWidth: '150px' }}
                               title={review.feedback}
                             >
                               {review.feedback || (
@@ -2178,461 +2428,225 @@ const TicketAnalytics = () => {
         onClose={() => setContentModalVisible(false)}
         size="lg"
         alignment="center"
-        className="modern-detail-modal"
       >
-        <div
-          style={{
-            background: '#1e2330',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              background: '#252b3b',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              padding: '18px 22px',
-            }}
-          >
-            <div className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '10px',
-                    background: '#3b82f6',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CIcon
-                    icon={cilDescription}
-                    style={{ color: '#fff', width: '18px', height: '18px' }}
-                  />
-                </div>
-                <div>
-                  <h5 className="fw-bold mb-0" style={{ color: '#f0f0f0', fontSize: '1.05rem' }}>
-                    Ticket Details
-                  </h5>
-                  <span style={{ color: '#8892a4', fontSize: '0.8rem' }}>
-                    #{selectedTicketContent?.id} • {selectedTicketContent?.service}
-                  </span>
-                </div>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                {selectedTicketContent && (
-                  <span
-                    className="px-3 py-1 rounded-pill fw-semibold"
-                    style={{
-                      fontSize: '0.72rem',
-                      background:
-                        selectedTicketContent.status === 'Completed'
-                          ? 'rgba(34,197,94,0.12)'
-                          : selectedTicketContent.status === 'In Progress'
-                            ? 'rgba(234,179,8,0.12)'
-                            : 'rgba(239,68,68,0.12)',
-                      color:
-                        selectedTicketContent.status === 'Completed'
-                          ? '#4ade80'
-                          : selectedTicketContent.status === 'In Progress'
-                            ? '#facc15'
-                            : '#f87171',
-                      border: `1px solid ${selectedTicketContent.status === 'Completed' ? 'rgba(34,197,94,0.2)' : selectedTicketContent.status === 'In Progress' ? 'rgba(234,179,8,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                    }}
-                  >
-                    {selectedTicketContent.status}
-                  </span>
-                )}
-                <button
-                  onClick={() => setContentModalVisible(false)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '6px',
-                    width: '30px',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#8892a4',
-                    transition: 'all 0.2s ease',
-                    fontSize: '14px',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                    e.currentTarget.style.color = '#ccc'
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = '#8892a4'
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
+        <CModalHeader onClose={() => setContentModalVisible(false)}>
+          <CModalTitle>
+            <div className="d-flex align-items-center gap-2">
+              <CIcon icon={cilDescription} className="text-primary" />
+              <span>Ticket Details</span>
+              <span className="text-secondary ms-2" style={{ fontSize: '0.9rem' }}>
+                #{selectedTicketContent?.id} • {selectedTicketContent?.service}
+              </span>
             </div>
-          </div>
-
-          {/* Body */}
-          <div style={{ padding: '20px 22px', maxHeight: '65vh', overflowY: 'auto' }}>
-            {selectedTicketContent && (
-              <div className="d-flex flex-column" style={{ gap: '16px' }}>
-                {/* Description */}
-                <div
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '16px 18px',
-                    borderLeft: '3px solid #3b82f6',
-                  }}
+          </CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {selectedTicketContent && (
+            <div className="d-flex flex-column gap-3">
+              {/* Status Badge */}
+              <div className="d-flex justify-content-end mb-2">
+                <span
+                  className={`px-3 py-1 rounded-pill fw-semibold ${
+                    selectedTicketContent.status === 'Completed'
+                      ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25'
+                      : selectedTicketContent.status === 'In Progress'
+                        ? 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25'
+                        : 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
+                  }`}
+                  style={{ fontSize: '0.8rem' }}
                 >
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <CIcon
-                      icon={cilDescription}
-                      style={{ color: '#8892a4', width: '15px', height: '15px' }}
-                    />
-                    <h6
-                      className="fw-semibold mb-0"
-                      style={{ color: '#cdd3e0', fontSize: '0.85rem' }}
-                    >
-                      Description
-                    </h6>
-                  </div>
-                  <p
-                    className="mb-0"
-                    style={{ color: '#9aa1b3', fontSize: '0.9rem', lineHeight: '1.65' }}
-                  >
-                    {selectedTicketContent.description}
-                  </p>
-                </div>
+                  {selectedTicketContent.status}
+                </span>
+              </div>
 
-                {/* Image */}
-                {selectedTicketContent.image && (
-                  <div
-                    style={{
-                      background: '#252b3b',
-                      borderRadius: '8px',
-                      padding: '16px 18px',
-                    }}
-                  >
-                    <div className="d-flex align-items-center gap-2 mb-3">
-                      <CIcon
-                        icon={cilImage}
-                        style={{ color: '#8892a4', width: '15px', height: '15px' }}
-                      />
-                      <h6
-                        className="fw-semibold mb-0"
-                        style={{ color: '#cdd3e0', fontSize: '0.85rem' }}
-                      >
-                        Attachment
-                      </h6>
-                    </div>
-                    <div
-                      className="text-center rounded-2 p-3"
-                      style={{
-                        background: '#1a1f2e',
-                        border: '1px solid rgba(255,255,255,0.04)',
-                      }}
+              {/* Description */}
+              <div className="p-3 border rounded-3 bg-body-secondary border-start border-primary border-4">
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <CIcon icon={cilDescription} className="text-secondary" />
+                  <h6 className="fw-semibold mb-0 text-body">Description</h6>
+                </div>
+                <p
+                  className="mb-0 text-secondary"
+                  style={{ fontSize: '0.9rem', lineHeight: '1.6' }}
+                >
+                  {selectedTicketContent.description}
+                </p>
+              </div>
+
+              {/* Image */}
+              {selectedTicketContent.image && (
+                <div className="p-3 border rounded-3 bg-body-secondary">
+                  <div className="d-flex align-items-center gap-2 mb-3">
+                    <CIcon icon={cilImage} className="text-secondary" />
+                    <h6 className="fw-semibold mb-0 text-body">Attachment</h6>
+                  </div>
+                  <div className="text-center rounded-2 p-3 bg-body-tertiary border shadow-sm">
+                    <a
+                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5656/api'}/../${selectedTicketContent.image}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="d-inline-block"
+                      style={{ cursor: 'zoom-in', outline: 'none' }}
                     >
                       <img
                         src={`${import.meta.env.VITE_API_URL || 'http://localhost:5656/api'}/../${selectedTicketContent.image}`}
                         alt="Ticket Attachment"
                         className="img-fluid rounded-2"
-                        style={{ maxHeight: '350px', objectFit: 'contain' }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Rating */}
-                {selectedTicketRating && hasPermission(userRole, 'canViewRatings') && (
-                  <div
-                    style={{
-                      background: '#252b3b',
-                      borderRadius: '8px',
-                      padding: '16px 18px',
-                      borderLeft: '3px solid #eab308',
-                    }}
-                  >
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <CIcon
-                          icon={cilStar}
-                          style={{ color: '#facc15', width: '15px', height: '15px' }}
-                        />
-                        <h6
-                          className="fw-semibold mb-0"
-                          style={{ color: '#cdd3e0', fontSize: '0.85rem' }}
-                        >
-                          User Rating
-                        </h6>
-                      </div>
-                      <div className="d-flex align-items-center gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span
-                            key={star}
-                            style={{
-                              color:
-                                star <= selectedTicketRating.rating
-                                  ? getDetailedRatingColor(selectedTicketRating.rating)
-                                  : 'rgba(255,255,255,0.12)',
-                              fontSize: '1.1rem',
-                            }}
-                          >
-                            ★
-                          </span>
-                        ))}
-                        <span
-                          className="ms-2 fw-bold"
-                          style={{
-                            color: getDetailedRatingColor(selectedTicketRating.rating),
-                            fontSize: '0.82rem',
-                            background: `${getDetailedRatingColor(selectedTicketRating.rating)}1A`, // 10% opacity
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          {selectedTicketRating.rating}/5
-                        </span>
-                      </div>
-                    </div>
-                    {selectedTicketRating.feedback && (
-                      <div
                         style={{
-                          background: '#1a1f2e',
-                          borderRadius: '6px',
-                          padding: '10px 14px',
-                          fontStyle: 'italic',
-                          color: '#9aa1b3',
-                          fontSize: '0.85rem',
+                          maxHeight: '350px',
+                          objectFit: 'contain',
+                          transition: 'transform 0.2s',
                         }}
-                      >
-                        &ldquo;{selectedTicketRating.feedback}&rdquo;
-                      </div>
-                    )}
+                        onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                        onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      />
+                    </a>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Notes & Activity */}
-                <div
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '16px 18px',
-                  }}
-                >
-                  <div className="d-flex align-items-center justify-content-between mb-3">
+              {/* Rating */}
+              {selectedTicketRating && hasPermission(userRole, 'canViewRatings') && (
+                <div className="p-3 border rounded-3 bg-body-secondary border-start border-warning border-4">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
                     <div className="d-flex align-items-center gap-2">
-                      <CIcon
-                        icon={cilList}
-                        style={{ color: '#8892a4', width: '15px', height: '15px' }}
-                      />
-                      <h6
-                        className="fw-semibold mb-0"
-                        style={{ color: '#cdd3e0', fontSize: '0.85rem' }}
-                      >
-                        Notes & Activity
-                      </h6>
+                      <CIcon icon={cilStar} className="text-warning" />
+                      <h6 className="fw-semibold mb-0 text-body">User Rating</h6>
                     </div>
-                    <span
-                      style={{
-                        color: '#6b7280',
-                        fontSize: '0.72rem',
-                        background: 'rgba(255,255,255,0.04)',
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                      }}
-                    >
-                      {currentTicketNotes.length} note{currentTicketNotes.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div
-                    className="d-flex flex-column gap-3 pe-1"
-                    style={{
-                      maxHeight: '300px',
-                      overflowY: 'auto',
-                      marginBottom: currentTicketNotes.length > 0 ? '14px' : '0',
-                    }}
-                  >
-                    {currentTicketNotes.length === 0 ? (
-                      <div
-                        className="text-center py-4 rounded-2"
-                        style={{
-                          background: '#1a1f2e',
-                          border: '1px dashed rgba(255,255,255,0.06)',
-                        }}
-                      >
-                        <CIcon
-                          icon={cilPencil}
-                          size="xl"
-                          style={{ color: 'rgba(136,146,164,0.35)', marginBottom: '6px' }}
-                        />
-                        <p className="mb-0" style={{ color: '#6b7280', fontSize: '0.82rem' }}>
-                          No notes yet
-                        </p>
-                      </div>
-                    ) : (
-                      currentTicketNotes.map((note, idx) => (
-                        <div
-                          key={idx}
-                          className="d-flex gap-3"
-                          style={{ animation: `fadeIn 0.3s ease ${idx * 0.05}s both` }}
-                        >
-                          <div className="flex-shrink-0">
-                            <div
-                              style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '8px',
-                                background:
-                                  note.author === 'Admin'
-                                    ? '#3b82f6'
-                                    : note.author === 'Operator'
-                                      ? '#6366f1'
-                                      : '#6b7280',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#fff',
-                                fontSize: '0.65rem',
-                                fontWeight: '700',
-                              }}
-                            >
-                              {getInitials(note.author)}
-                            </div>
-                          </div>
-                          <div
-                            className="flex-grow-1 rounded-2"
-                            style={{
-                              background: '#1a1f2e',
-                              border: '1px solid rgba(255,255,255,0.04)',
-                              padding: '10px 14px',
-                            }}
-                          >
-                            <div className="d-flex justify-content-between align-items-center mb-1">
-                              <strong style={{ color: '#cdd3e0', fontSize: '0.78rem' }}>
-                                {note.author}
-                              </strong>
-                              <small style={{ color: '#6b7280', fontSize: '0.68rem' }}>
-                                {new Date(note.timestamp).toLocaleString()}
-                              </small>
-                            </div>
-                            <p
-                              className="mb-0"
-                              style={{
-                                color: '#9aa1b3',
-                                fontSize: '0.82rem',
-                                whiteSpace: 'pre-wrap',
-                                lineHeight: '1.5',
-                              }}
-                            >
-                              {note.content}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Add Note Form */}
-                  {hasPermission(userRole, 'canAddNotes') && (
-                    <CForm onSubmit={handleAddNote}>
-                      <div
-                        style={{
-                          background: '#1a1f2e',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255,255,255,0.04)',
-                          padding: '14px',
-                        }}
-                      >
-                        <CFormLabel
-                          className="fw-semibold mb-2"
-                          style={{ color: '#8892a4', fontSize: '1rem' }}
-                        >
-                          Add Note
-                        </CFormLabel>
-                        <CFormTextarea
-                          rows={2}
-                          value={noteText}
-                          onChange={(e) => setNoteText(e.target.value)}
-                          placeholder="Type your note..."
+                    <div className="d-flex align-items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
                           style={{
-                            background: 'rgba(0,0,0,0.25)',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            borderRadius: '6px',
-                            color: '#e2e8f0',
-                            fontSize: '0.85rem',
-                            resize: 'none',
+                            color:
+                              star <= selectedTicketRating.rating
+                                ? getDetailedRatingColor(selectedTicketRating.rating)
+                                : 'rgba(100,100,100,0.2)',
+                            fontSize: '1.1rem',
                           }}
-                        />
-                        <div className="d-flex justify-content-end mt-2">
-                          <CButton
-                            type="submit"
-                            disabled={!noteText.trim()}
-                            className="d-flex align-items-center gap-2 border-0"
-                            style={{
-                              background: noteText.trim() ? '#3b82f6' : 'rgba(255,255,255,0.04)',
-                              color: noteText.trim() ? '#fff' : '#6b7280',
-                              borderRadius: '6px',
-                              padding: '7px 18px',
-                              fontSize: '0.82rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s ease',
-                            }}
-                          >
-                            <CIcon icon={cilPencil} size="sm" /> Post Note
-                          </CButton>
-                        </div>
-                      </div>
-                    </CForm>
+                        >
+                          ★
+                        </span>
+                      ))}
+                      <span
+                        className="ms-2 fw-bold px-2 py-1 rounded"
+                        style={{
+                          color: getDetailedRatingColor(selectedTicketRating.rating),
+                          fontSize: '0.85rem',
+                          background: `${getDetailedRatingColor(selectedTicketRating.rating)}1A`,
+                        }}
+                      >
+                        {selectedTicketRating.rating}/5
+                      </span>
+                    </div>
+                  </div>
+                  {selectedTicketRating.feedback && (
+                    <div
+                      className="p-2 rounded-2 bg-body-tertiary text-secondary border mt-2 fst-italic"
+                      style={{ fontSize: '0.9rem' }}
+                    >
+                      &ldquo;{selectedTicketRating.feedback}&rdquo;
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Footer */}
-          <div
-            style={{
-              padding: '14px 22px',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-              background: '#1a1f2e',
-              display: 'flex',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              onClick={() => setContentModalVisible(false)}
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '6px',
-                padding: '7px 22px',
-                color: '#8892a4',
-                fontSize: '0.82rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                e.currentTarget.style.color = '#ccc'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                e.currentTarget.style.color = '#8892a4'
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
+              {/* Notes & Activity */}
+              <div className="p-3 border rounded-3 bg-body-secondary">
+                <div className="d-flex align-items-center justify-content-between mb-3">
+                  <div className="d-flex align-items-center gap-2">
+                    <CIcon icon={cilList} className="text-secondary" />
+                    <h6 className="fw-semibold mb-0 text-body">Notes & Activity</h6>
+                  </div>
+                  <span className="badge bg-secondary">
+                    {currentTicketNotes.length} note{currentTicketNotes.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div
+                  className="d-flex flex-column gap-3"
+                  style={{
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    marginBottom: currentTicketNotes.length > 0 ? '14px' : '0',
+                  }}
+                >
+                  {currentTicketNotes.length === 0 ? (
+                    <div className="text-center py-4 rounded-2 border border-dashed bg-body-tertiary">
+                      <CIcon icon={cilPencil} size="xl" className="text-muted opacity-50 mb-2" />
+                      <p className="mb-0 text-muted small">No notes yet</p>
+                    </div>
+                  ) : (
+                    currentTicketNotes.map((note, idx) => (
+                      <div key={idx} className="d-flex gap-3">
+                        <div className="flex-shrink-0">
+                          <div
+                            className={`rounded-circle d-flex align-items-center justify-content-center text-white fw-bold ${
+                              note.author === 'Admin'
+                                ? 'bg-primary'
+                                : note.author === 'Operator'
+                                  ? 'bg-info'
+                                  : 'bg-secondary'
+                            }`}
+                            style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}
+                          >
+                            {getInitials(note.author)}
+                          </div>
+                        </div>
+                        <div className="flex-grow-1 p-2 rounded-3 bg-body-tertiary border shadow-sm">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <strong className="text-body small">{note.author}</strong>
+                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>
+                              {new Date(note.timestamp).toLocaleString()}
+                            </small>
+                          </div>
+                          <p
+                            className="mb-0 text-secondary"
+                            style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}
+                          >
+                            {note.content}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add Note Form */}
+                {hasPermission(userRole, 'canAddNotes') && (
+                  <CForm onSubmit={handleAddNote} className="mt-3">
+                    <div className="p-3 bg-body-tertiary border rounded-3">
+                      <CFormLabel className="fw-semibold text-body small">Add Note</CFormLabel>
+                      <CFormTextarea
+                        rows={2}
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="Type your note..."
+                        className="bg-body-secondary"
+                      />
+                      <div className="d-flex justify-content-end mt-2">
+                        <CButton
+                          type="submit"
+                          color="primary"
+                          disabled={!noteText.trim()}
+                          size="sm"
+                          className="d-flex align-items-center gap-2"
+                        >
+                          <CIcon icon={cilPencil} size="sm" /> Post Note
+                        </CButton>
+                      </div>
+                    </div>
+                  </CForm>
+                )}
+              </div>
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setContentModalVisible(false)}>
+            Close
+          </CButton>
+        </CModalFooter>
       </CModal>
 
       {/* Assign Modal */}
@@ -2672,417 +2686,187 @@ const TicketAnalytics = () => {
         </CModalFooter>
       </CModal>
 
-      {/* Timeline Details Modal - Clean Dark */}
+      {/* Timeline Details Modal */}
       <CModal
         visible={detailsVisible}
         onClose={() => setDetailsVisible(false)}
         alignment="center"
         size="lg"
-        className="modern-detail-modal"
       >
-        <div
-          style={{
-            background: '#1e2330',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              background: '#252b3b',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              padding: '18px 22px',
-            }}
-          >
-            <div className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '10px',
-                    background: '#3b82f6',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CIcon icon={cilClock} style={{ color: '#fff', width: '18px', height: '18px' }} />
-                </div>
-                <div>
-                  <h5 className="fw-bold mb-0" style={{ color: '#f0f0f0', fontSize: '1.05rem' }}>
-                    Ticket Timeline
-                  </h5>
-                  <span style={{ color: '#8892a4', fontSize: '0.8rem' }}>
-                    #{selectedTicketForDetails?.id} • {selectedTicketForDetails?.service}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setDetailsVisible(false)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '6px',
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#8892a4',
-                  transition: 'all 0.2s ease',
-                  fontSize: '14px',
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                  e.currentTarget.style.color = '#ccc'
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = '#8892a4'
-                }}
-              >
-                ✕
-              </button>
+        <CModalHeader onClose={() => setDetailsVisible(false)}>
+          <CModalTitle>
+            <div className="d-flex align-items-center gap-2">
+              <CIcon icon={cilClock} className="text-primary" />
+              <span>Ticket Timeline</span>
+              <span className="text-secondary ms-2" style={{ fontSize: '0.9rem' }}>
+                #{selectedTicketForDetails?.id} • {selectedTicketForDetails?.service}
+              </span>
             </div>
-          </div>
-
-          {/* Body */}
-          <div style={{ padding: '20px 22px' }}>
-            {selectedTicketForDetails && (
-              <div className="d-flex flex-column" style={{ gap: '12px' }}>
-                {/* Last Login */}
+          </CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {selectedTicketForDetails && (
+            <div className="d-flex flex-column gap-3">
+              {/* Last Login */}
+              <div className="d-flex align-items-center gap-3 p-3 bg-body-secondary border rounded-3 text-body">
                 <div
-                  className="d-flex align-items-center gap-3"
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '14px 18px',
-                  }}
+                  className="flex-shrink-0 d-flex align-items-center justify-content-center bg-primary bg-opacity-10 rounded-circle"
+                  style={{ width: '40px', height: '40px' }}
                 >
-                  <div
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      background: 'rgba(59,130,246,0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <CIcon
-                      icon={cilUser}
-                      style={{ color: '#3b82f6', width: '16px', height: '16px' }}
-                    />
-                  </div>
-                  <div className="flex-grow-1">
-                    <p
-                      className="text-uppercase fw-bold mb-0"
-                      style={{ color: '#8892a4', fontSize: '0.68rem', letterSpacing: '0.3px' }}
-                    >
-                      Last Login
-                    </p>
-                    <p
-                      className="fw-semibold mb-0"
-                      style={{ color: '#e2e8f0', fontSize: '0.88rem' }}
-                    >
-                      {selectedTicketForDetails.userDetails?.lastLogin
-                        ? new Date(selectedTicketForDetails.userDetails.lastLogin).toLocaleString()
-                        : 'N/A'}
-                    </p>
-                  </div>
-                  <small style={{ color: '#6b7280', fontSize: '0.7rem' }}>User activity</small>
+                  <CIcon icon={cilUser} className="text-primary" />
                 </div>
+                <div className="flex-grow-1">
+                  <p
+                    className="text-uppercase fw-bold mb-0 text-secondary"
+                    style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}
+                  >
+                    Last Login
+                  </p>
+                  <p className="fw-semibold mb-0" style={{ fontSize: '0.95rem' }}>
+                    {selectedTicketForDetails.userDetails?.lastLogin
+                      ? new Date(selectedTicketForDetails.userDetails.lastLogin).toLocaleString()
+                      : 'N/A'}
+                  </p>
+                </div>
+                <small className="text-secondary">User activity</small>
+              </div>
 
-                {/* Created On */}
+              {/* Created On */}
+              <div className="d-flex align-items-center gap-3 p-3 bg-body-secondary border rounded-3 text-body">
                 <div
-                  className="d-flex align-items-center gap-3"
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '14px 18px',
-                  }}
+                  className="flex-shrink-0 d-flex align-items-center justify-content-center bg-success bg-opacity-10 rounded-circle"
+                  style={{ width: '40px', height: '40px' }}
                 >
-                  <div
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      background: 'rgba(34,197,94,0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <CIcon
-                      icon={cilPlus}
-                      style={{ color: '#22c55e', width: '16px', height: '16px' }}
-                    />
-                  </div>
-                  <div className="flex-grow-1">
-                    <p
-                      className="text-uppercase fw-bold mb-0"
-                      style={{ color: '#8892a4', fontSize: '0.68rem', letterSpacing: '0.3px' }}
-                    >
-                      Created On
-                    </p>
-                    <p
-                      className="fw-semibold mb-0"
-                      style={{ color: '#e2e8f0', fontSize: '0.88rem' }}
-                    >
-                      {new Date(selectedTicketForDetails.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <small style={{ color: '#6b7280', fontSize: '0.7rem' }}>Initialized</small>
+                  <CIcon icon={cilPlus} className="text-success" />
                 </div>
+                <div className="flex-grow-1">
+                  <p
+                    className="text-uppercase fw-bold mb-0 text-secondary"
+                    style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}
+                  >
+                    Created On
+                  </p>
+                  <p className="fw-semibold mb-0" style={{ fontSize: '0.95rem' }}>
+                    {new Date(selectedTicketForDetails.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <small className="text-secondary">Initialized</small>
+              </div>
 
-                {/* Closed On */}
+              {/* Closed On */}
+              <div className="d-flex align-items-center gap-3 p-3 bg-body-secondary border rounded-3 text-body">
                 <div
-                  className="d-flex align-items-center gap-3"
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '14px 18px',
-                  }}
+                  className={`flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle ${selectedTicketForDetails.status === 'Completed' ? 'bg-primary bg-opacity-10' : 'bg-secondary bg-opacity-10'}`}
+                  style={{ width: '40px', height: '40px' }}
                 >
-                  <div
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      background:
-                        selectedTicketForDetails.status === 'Completed'
-                          ? 'rgba(59,130,246,0.12)'
-                          : 'rgba(107,114,128,0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <CIcon
-                      icon={cilCheckCircle}
-                      style={{
-                        color:
-                          selectedTicketForDetails.status === 'Completed' ? '#3b82f6' : '#6b7280',
-                        width: '16px',
-                        height: '16px',
-                      }}
-                    />
-                  </div>
-                  <div className="flex-grow-1">
-                    <p
-                      className="text-uppercase fw-bold mb-0"
-                      style={{ color: '#8892a4', fontSize: '0.68rem', letterSpacing: '0.3px' }}
-                    >
-                      Closed On
-                    </p>
-                    <p
-                      className="fw-semibold mb-0"
-                      style={{ color: '#e2e8f0', fontSize: '0.88rem' }}
-                    >
-                      {selectedTicketForDetails.status === 'Completed'
-                        ? new Date(selectedTicketForDetails.updatedAt).toLocaleString()
-                        : 'Pending...'}
-                    </p>
-                  </div>
-                  <small style={{ color: '#6b7280', fontSize: '0.7rem' }}>Resolution</small>
+                  <CIcon
+                    icon={cilCheckCircle}
+                    className={
+                      selectedTicketForDetails.status === 'Completed'
+                        ? 'text-primary'
+                        : 'text-secondary'
+                    }
+                  />
                 </div>
+                <div className="flex-grow-1">
+                  <p
+                    className="text-uppercase fw-bold mb-0 text-secondary"
+                    style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}
+                  >
+                    Closed On
+                  </p>
+                  <p className="fw-semibold mb-0" style={{ fontSize: '0.95rem' }}>
+                    {selectedTicketForDetails.status === 'Completed'
+                      ? new Date(selectedTicketForDetails.updatedAt).toLocaleString()
+                      : 'Pending...'}
+                  </p>
+                </div>
+                <small className="text-secondary">Resolution</small>
+              </div>
 
-                {/* Last Update */}
+              {/* Last Update */}
+              <div className="d-flex align-items-center gap-3 p-3 bg-body-secondary border rounded-3 text-body">
                 <div
-                  className="d-flex align-items-center gap-3"
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '14px 18px',
-                  }}
+                  className="flex-shrink-0 d-flex align-items-center justify-content-center bg-warning bg-opacity-10 rounded-circle"
+                  style={{ width: '40px', height: '40px' }}
                 >
-                  <div
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      background: 'rgba(234,179,8,0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <CIcon
-                      icon={cilPencil}
-                      style={{ color: '#eab308', width: '16px', height: '16px' }}
-                    />
-                  </div>
-                  <div className="flex-grow-1">
-                    <p
-                      className="text-uppercase fw-bold mb-0"
-                      style={{ color: '#8892a4', fontSize: '0.68rem', letterSpacing: '0.3px' }}
-                    >
-                      Last Update
-                    </p>
-                    <p
-                      className="fw-semibold mb-0"
-                      style={{ color: '#e2e8f0', fontSize: '0.88rem' }}
-                    >
-                      {new Date(selectedTicketForDetails.updatedAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <small style={{ color: '#6b7280', fontSize: '0.7rem' }}>Recent activity</small>
+                  <CIcon icon={cilPencil} className="text-warning" />
                 </div>
+                <div className="flex-grow-1">
+                  <p
+                    className="text-uppercase fw-bold mb-0 text-secondary"
+                    style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}
+                  >
+                    Last Update
+                  </p>
+                  <p className="fw-semibold mb-0" style={{ fontSize: '0.95rem' }}>
+                    {new Date(selectedTicketForDetails.updatedAt).toLocaleString()}
+                  </p>
+                </div>
+                <small className="text-secondary">Recent activity</small>
+              </div>
 
-                {/* Display Expiry */}
+              {/* Display Expiry */}
+              <div
+                className={`d-flex align-items-center gap-3 p-3 bg-body-secondary border rounded-3 text-body border-start border-4 ${selectedTicketForDetails.expiresAt && new Date(selectedTicketForDetails.expiresAt) < new Date() ? 'border-danger' : 'border-success'}`}
+              >
                 <div
-                  className="d-flex align-items-center gap-3"
-                  style={{
-                    background: '#252b3b',
-                    borderRadius: '8px',
-                    padding: '14px 18px',
-                    borderLeft:
+                  className={`flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle ${selectedTicketForDetails.expiresAt && new Date(selectedTicketForDetails.expiresAt) < new Date() ? 'bg-danger bg-opacity-10 text-danger' : 'bg-success bg-opacity-10 text-success'}`}
+                  style={{ width: '40px', height: '40px' }}
+                >
+                  <CIcon
+                    icon={
                       selectedTicketForDetails.expiresAt &&
                       new Date(selectedTicketForDetails.expiresAt) < new Date()
-                        ? '3px solid #ef4444'
-                        : '3px solid #252b3b',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      background: 'rgba(239,68,68,0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <CIcon
-                      icon={cilWarning}
-                      style={{ color: '#ef4444', width: '16px', height: '16px' }}
-                    />
-                  </div>
-                  <div className="flex-grow-1">
-                    <p
-                      className="text-uppercase fw-bold mb-0"
-                      style={{ color: '#8892a4', fontSize: '0.68rem', letterSpacing: '0.3px' }}
-                    >
-                      Display Expiry
-                    </p>
-                    <p
-                      className="fw-semibold mb-0"
-                      style={{ color: '#e2e8f0', fontSize: '0.88rem' }}
-                    >
-                      {selectedTicketForDetails.expiresAt
-                        ? new Date(selectedTicketForDetails.expiresAt).toLocaleDateString(
-                            undefined,
-                            {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            },
-                          )
-                        : 'N/A'}
-                    </p>
-                  </div>
-                  <span
-                    className="px-2 py-1 rounded-pill"
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: '600',
-                      background:
-                        selectedTicketForDetails.expiresAt &&
-                        new Date(selectedTicketForDetails.expiresAt) < new Date()
-                          ? 'rgba(239,68,68,0.12)'
-                          : 'rgba(34,197,94,0.1)',
-                      color:
-                        selectedTicketForDetails.expiresAt &&
-                        new Date(selectedTicketForDetails.expiresAt) < new Date()
-                          ? '#f87171'
-                          : '#4ade80',
-                    }}
-                  >
-                    {selectedTicketForDetails.expiresAt &&
-                    new Date(selectedTicketForDetails.expiresAt) < new Date()
-                      ? 'Expired'
-                      : 'Active'}
-                  </span>
+                        ? cilWarning
+                        : cilCheckCircle
+                    }
+                  />
                 </div>
+                <div className="flex-grow-1">
+                  <p
+                    className="text-uppercase fw-bold mb-0 text-secondary"
+                    style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}
+                  >
+                    Display Expiry
+                  </p>
+                  <p className="fw-semibold mb-0" style={{ fontSize: '0.95rem' }}>
+                    {selectedTicketForDetails.expiresAt
+                      ? new Date(selectedTicketForDetails.expiresAt).toLocaleDateString(undefined, {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })
+                      : 'N/A'}
+                  </p>
+                </div>
+                <span
+                  className={`badge ${selectedTicketForDetails.expiresAt && new Date(selectedTicketForDetails.expiresAt) < new Date() ? 'bg-danger' : 'bg-success'}`}
+                >
+                  {selectedTicketForDetails.expiresAt &&
+                  new Date(selectedTicketForDetails.expiresAt) < new Date()
+                    ? 'Expired'
+                    : 'Active'}
+                </span>
               </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div
-            style={{
-              padding: '14px 22px',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-              background: '#1a1f2e',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '10px',
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setDetailsVisible(false)}>
+            Close
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={() => {
+              setDetailsVisible(false)
+              openContentModal(selectedTicketForDetails)
             }}
           >
-            <button
-              onClick={() => setDetailsVisible(false)}
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '6px',
-                padding: '7px 22px',
-                color: '#8892a4',
-                fontSize: '0.82rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                e.currentTarget.style.color = '#ccc'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                e.currentTarget.style.color = '#8892a4'
-              }}
-            >
-              Close
-            </button>
-            <button
-              onClick={() => {
-                setDetailsVisible(false)
-                openContentModal(selectedTicketForDetails)
-              }}
-              style={{
-                background: '#3b82f6',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '7px 22px',
-                color: '#fff',
-                fontSize: '0.82rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#2563eb'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#3b82f6'
-              }}
-            >
-              View Full Details
-            </button>
-          </div>
-        </div>
+            View Full Details
+          </CButton>
+        </CModalFooter>
       </CModal>
 
       {/* Edit Modal */}
@@ -3125,250 +2909,147 @@ const TicketAnalytics = () => {
         onClose={() => setReviewModalVisible(false)}
         size="lg"
         alignment="center"
-        className="modern-detail-modal"
       >
-        <div
-          style={{
-            background: '#1e2330',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              background: '#252b3b',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              padding: '18px 22px',
-            }}
-          >
-            <div className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '10px',
-                    background: '#3b82f6',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CIcon
-                    icon={cilDescription}
-                    style={{ color: '#fff', width: '18px', height: '18px' }}
-                  />
-                </div>
-                <div>
-                  <h5 className="fw-bold mb-0" style={{ color: '#f0f0f0', fontSize: '1.05rem' }}>
-                    Review Details
-                  </h5>
-                  <span style={{ color: '#8892a4', fontSize: '0.8rem' }}>
-                    Review ID: #{selectedReview?.ratingId}
-                  </span>
-                </div>
-              </div>
-              <CButton
-                color="secondary"
-                variant="ghost"
-                size="sm"
-                onClick={() => setReviewModalVisible(false)}
-                style={{ color: '#8892a4' }}
-              >
-                <CIcon icon={cilX} />
-              </CButton>
+        <CModalHeader onClose={() => setReviewModalVisible(false)}>
+          <CModalTitle>
+            <div className="d-flex align-items-center gap-2">
+              <CIcon icon={cilDescription} className="text-primary" />
+              <span>Review Details</span>
+              <span className="text-secondary ms-2" style={{ fontSize: '0.9rem' }}>
+                (ID: #{selectedReview?.ratingId})
+              </span>
             </div>
-          </div>
-
-          <div className="p-4">
-            {selectedReview && (
-              <CRow className="g-4">
-                {/* Customer Details */}
-                <CCol md={6}>
-                  <div
-                    className="p-3 rounded-3 h-100"
-                    style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <h6 className="text-secondary text-uppercase small fw-bold mb-3">
-                      Customer Details
-                    </h6>
-                    <div className="d-flex flex-column gap-2 text-white">
-                      <div>
-                        <span className="text-secondary small d-block">Name</span>
-                        <span className="fw-medium">{selectedReview.customerName}</span>
-                      </div>
-                      <div>
-                        <span className="text-secondary small d-block">City / Location</span>
-                        <span className="fw-medium">{selectedReview.customerCity}</span>
-                      </div>
-                      <div>
-                        <span className="text-secondary small d-block">Contact Info</span>
-                        <span className="fw-medium d-block">{selectedReview.userEmail}</span>
-                        <span className="fw-medium d-block">{selectedReview.userPhone}</span>
-                      </div>
+          </CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {selectedReview && (
+            <CRow className="g-4">
+              <CCol md={6}>
+                <div className="p-3 border rounded-3 h-100 bg-body-secondary">
+                  <h6 className="text-uppercase small fw-bold mb-3 text-secondary">
+                    Customer Details
+                  </h6>
+                  <div className="d-flex flex-column gap-2 text-body">
+                    <div>
+                      <span className="text-secondary small d-block">Name</span>
+                      <span className="fw-medium">{selectedReview.customerName}</span>
+                    </div>
+                    <div>
+                      <span className="text-secondary small d-block">City / Location</span>
+                      <span className="fw-medium">{selectedReview.customerCity}</span>
+                    </div>
+                    <div>
+                      <span className="text-secondary small d-block">Contact Info</span>
+                      <span className="fw-medium d-block">{selectedReview.userEmail}</span>
+                      <span className="fw-medium d-block">{selectedReview.userPhone}</span>
                     </div>
                   </div>
-                </CCol>
+                </div>
+              </CCol>
 
-                {/* Operator Details */}
-                <CCol md={6}>
-                  <div
-                    className="p-3 rounded-3 h-100"
-                    style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <h6 className="text-secondary text-uppercase small fw-bold mb-3">
-                      Operator Details
-                    </h6>
-                    <div className="d-flex flex-column gap-2 text-white">
-                      <div>
-                        <span className="text-secondary small d-block">Assigned Operator</span>
-                        <div className="d-flex align-items-center gap-2 mt-1">
-                          {selectedReview.operatorName !== 'Unassigned' && (
-                            <div
-                              className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                              style={{
-                                width: '24px',
-                                height: '24px',
-                                background: '#3b82f6',
-                                fontSize: '10px',
-                              }}
-                            >
-                              {selectedReview.operatorName.substring(0, 2).toUpperCase()}
-                            </div>
-                          )}
-                          <span className="fw-medium">{selectedReview.operatorName}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-secondary small d-block">Operator ID</span>
-                        <span className="fw-medium">{selectedReview.operatorId || 'N/A'}</span>
-                      </div>
-                      <div>
-                        <span className="text-secondary small d-block">Contact Info</span>
-                        <span className="fw-medium d-block">{selectedReview.operatorEmail}</span>
-                        <span className="fw-medium d-block">{selectedReview.operatorPhone}</span>
+              <CCol md={6}>
+                <div className="p-3 border rounded-3 h-100 bg-body-secondary">
+                  <h6 className="text-uppercase small fw-bold mb-3 text-secondary">
+                    Operator Details
+                  </h6>
+                  <div className="d-flex flex-column gap-2 text-body">
+                    <div>
+                      <span className="text-secondary small d-block">Assigned Operator</span>
+                      <div className="d-flex align-items-center gap-2 mt-1">
+                        {selectedReview.operatorName !== 'Unassigned' && (
+                          <div
+                            className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold bg-primary"
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              fontSize: '10px',
+                            }}
+                          >
+                            {selectedReview.operatorName.substring(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="fw-medium">{selectedReview.operatorName}</span>
                       </div>
                     </div>
-                  </div>
-                </CCol>
-
-                {/* Service Details */}
-                <CCol md={12}>
-                  <div
-                    className="p-3 rounded-3"
-                    style={{ background: '#1a1f2e', border: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <h6 className="text-secondary text-uppercase small fw-bold mb-3">
-                      Service Details
-                    </h6>
-                    <div className="d-flex flex-wrap gap-4 text-white">
-                      <div>
-                        <span className="text-secondary small d-block">Service Type</span>
-                        <span className="fw-medium">{selectedReview.ticketService}</span>
-                      </div>
-                      <div className="flex-grow-1">
-                        <span className="text-secondary small d-block">Description</span>
-                        <span className="fw-medium">{selectedReview.ticketDescription}</span>
-                      </div>
-                      <div>
-                        <span className="text-secondary small d-block">Ticket ID</span>
-                        <span className="badge bg-info bg-opacity-25 text-info">
-                          #{selectedReview.ticketId}
-                        </span>
-                      </div>
+                    <div>
+                      <span className="text-secondary small d-block">Operator ID</span>
+                      <span className="fw-medium">{selectedReview.operatorId || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-secondary small d-block">Contact Info</span>
+                      <span className="fw-medium d-block">{selectedReview.operatorEmail}</span>
+                      <span className="fw-medium d-block">{selectedReview.operatorPhone}</span>
                     </div>
                   </div>
-                </CCol>
+                </div>
+              </CCol>
 
-                {/* Review Content */}
-                <CCol md={12}>
-                  <div
-                    className="p-3 rounded-3"
-                    style={{
-                      background: 'rgba(234, 179, 8, 0.05)',
-                      border: '1px solid rgba(234, 179, 8, 0.1)',
-                    }}
-                  >
-                    <h6 className="text-warning text-uppercase small fw-bold mb-3">
-                      Feedback & Rating
-                    </h6>
-                    <div className="d-flex flex-column gap-3">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="d-flex text-warning">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <span
-                              key={star}
-                              style={{
-                                color:
-                                  star <= selectedReview.rating
-                                    ? getDetailedRatingColor(selectedReview.rating)
-                                    : 'rgba(255,255,255,0.1)',
-                                fontSize: '1.2rem',
-                              }}
-                            >
-                              ★
-                            </span>
-                          ))}
-                        </div>
-                        <span className="fw-bold text-white ms-2">{selectedReview.rating}/5</span>
-                        <span className="text-secondary small ms-auto">
-                          Submitted on {new Date(selectedReview.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div
-                        className="p-3 rounded-2"
-                        style={{
-                          background: 'rgba(0,0,0,0.2)',
-                          color: '#e0e0e0',
-                          fontStyle: 'italic',
-                        }}
-                      >
-                        "{selectedReview.feedback || 'No written feedback provided.'}"
-                      </div>
+              <CCol md={12}>
+                <div className="p-3 border rounded-3 bg-body-secondary">
+                  <h6 className="text-uppercase small fw-bold mb-3 text-secondary">
+                    Service Details
+                  </h6>
+                  <div className="d-flex flex-wrap gap-4 text-body">
+                    <div>
+                      <span className="text-secondary small d-block">Service Type</span>
+                      <span className="fw-medium">{selectedReview.ticketService}</span>
+                    </div>
+                    <div className="flex-grow-1">
+                      <span className="text-secondary small d-block">Description</span>
+                      <span className="fw-medium">{selectedReview.ticketDescription}</span>
+                    </div>
+                    <div>
+                      <span className="text-secondary small d-block">Ticket ID</span>
+                      <span className="badge bg-info bg-opacity-25 text-info">
+                        #{selectedReview.ticketId}
+                      </span>
                     </div>
                   </div>
-                </CCol>
-              </CRow>
-            )}
-          </div>
+                </div>
+              </CCol>
 
-          {/* Footer Actions */}
-          <div
-            className="d-flex justify-content-end p-3"
-            style={{
-              background: '#252b3b',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <button
-              onClick={() => setReviewModalVisible(false)}
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '7px 22px',
-                color: '#8892a4',
-                fontSize: '0.82rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                e.currentTarget.style.color = '#ccc'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                e.currentTarget.style.color = '#8892a4'
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
+              <CCol md={12}>
+                <div className="p-3 border border-warning rounded-3 bg-warning bg-opacity-10">
+                  <h6 className="text-warning text-uppercase small fw-bold mb-3">
+                    Feedback & Rating
+                  </h6>
+                  <div className="d-flex flex-column gap-3">
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="d-flex text-warning">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            style={{
+                              color:
+                                star <= selectedReview.rating
+                                  ? getDetailedRatingColor(selectedReview.rating)
+                                  : 'rgba(100,100,100,0.2)',
+                              fontSize: '1.2rem',
+                            }}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <span className="fw-bold text-body ms-2">{selectedReview.rating}/5</span>
+                      <span className="text-secondary small ms-auto">
+                        Submitted on {new Date(selectedReview.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-2 bg-body-tertiary text-body shadow-sm border fst-italic">
+                      "{selectedReview.feedback || 'No written feedback provided.'}"
+                    </div>
+                  </div>
+                </div>
+              </CCol>
+            </CRow>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setReviewModalVisible(false)}>
+            Close
+          </CButton>
+        </CModalFooter>
       </CModal>
       <RatingModal
         visible={ratingModalVisible}

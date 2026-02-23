@@ -34,10 +34,24 @@ const getRatingsByOperator = (operatorId) => {
   })
 }
 
+const checkRatedTicketsBatch = (ticketIds) => {
+  const token = authService.getToken()
+  return axios.post(
+    API_URL + 'check-batch',
+    { ticketIds },
+    {
+      headers: {
+        Authorization: 'Bearer ' + token,
+      },
+    },
+  )
+}
+
 const RatingService = {
   createRating,
   getRatingByTicketId,
   getRatingsByOperator,
+  checkRatedTicketsBatch,
   getAllRatings: () => {
     const token = authService.getToken()
     return axios.get(API_URL, {

@@ -30,6 +30,10 @@ const MySwal = withReactContent(Swal)
 
 const UserList = () => {
   const [users, setUsers] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const limit = 10
+
   const { getUsers, deleteUser, updateUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -44,10 +48,16 @@ const UserList = () => {
     setVisible(true)
   }
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1) => {
     try {
-      const data = await getUsers()
-      setUsers(data)
+      const data = await getUsers(page, limit)
+      if (data.data) {
+        setUsers(data.data)
+        setCurrentPage(data.currentPage)
+        setTotalPages(data.totalPages)
+      } else {
+        setUsers(data)
+      }
     } catch (error) {
       console.error('Failed to fetch users', error)
       toast.error('Failed to fetch users')
@@ -55,7 +65,7 @@ const UserList = () => {
   }
 
   useEffect(() => {
-    fetchUsers()
+    fetchUsers(currentPage)
   }, [getUsers])
 
   const handleDelete = async (id) => {
@@ -72,7 +82,7 @@ const UserList = () => {
         try {
           await deleteUser(id)
           toast.success('User deleted successfully')
-          fetchUsers() // Refresh list
+          fetchUsers(currentPage) // Refresh list
         } catch (error) {
           console.error('Failed to delete user', error)
           toast.error('Failed to delete user')
@@ -89,7 +99,7 @@ const UserList = () => {
     try {
       await updateUser(id, { status: 'approved' })
       toast.success('User approved successfully')
-      fetchUsers()
+      fetchUsers(currentPage)
     } catch (error) {
       console.error('Failed to approve user', error)
       toast.error('Failed to approve user')
@@ -177,6 +187,37 @@ const UserList = () => {
                 ))}
               </CTableBody>
             </CTable>
+            {totalPages > 1 && (
+              <div className="d-flex justify-content-center mt-3 mb-4">
+                <CButton
+                  color="primary"
+                  variant="outline"
+                  disabled={currentPage === 1}
+                  onClick={() => {
+                    setCurrentPage(currentPage - 1)
+                    fetchUsers(currentPage - 1)
+                  }}
+                  className="me-2"
+                >
+                  Previous
+                </CButton>
+                <span className="align-self-center mx-3 fw-bold">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <CButton
+                  color="primary"
+                  variant="outline"
+                  disabled={currentPage === totalPages}
+                  onClick={() => {
+                    setCurrentPage(currentPage + 1)
+                    fetchUsers(currentPage + 1)
+                  }}
+                  className="ms-2"
+                >
+                  Next
+                </CButton>
+              </div>
+            )}
           </CCardBody>
         </CCard>
       </CCol>

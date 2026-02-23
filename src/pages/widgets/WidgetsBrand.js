@@ -38,6 +38,12 @@ const WidgetsBrand = (props) => {
     <CRow className={props.className} xs={{ gutter: 4 }}>
       <CCol sm={6} xl={4} xxl={3}>
         <CWidgetStatsD
+          className="mb-4 shadow-lg border-0 text-white"
+          style={{
+            background: 'linear-gradient(135deg, #182848 0%, #4b6cb7 100%)',
+            borderRadius: '15px',
+            overflow: 'hidden',
+          }}
           {...(props.withCharts && {
             chart: (
               <CChart
@@ -60,18 +66,27 @@ const WidgetsBrand = (props) => {
               />
             ),
           })}
-          icon={<CIcon icon={cibFacebook} height={52} className="my-4 text-white" />}
+          icon={<CIcon icon={cibFacebook} height={52} className="my-4 text-white opacity-75" />}
           values={[
-            { title: 'friends', value: '89K' },
-            { title: 'feeds', value: '459' },
+            {
+              title: <span className="text-white opacity-75">friends</span>,
+              value: <span className="fs-3 fw-bold text-white">89K</span>,
+            },
+            {
+              title: <span className="text-white opacity-75">feeds</span>,
+              value: <span className="fs-3 fw-bold text-white">459</span>,
+            },
           ]}
-          style={{
-            '--cui-card-cap-bg': '#3b5998',
-          }}
         />
       </CCol>
       <CCol sm={6} xl={4} xxl={3}>
         <CWidgetStatsD
+          className="mb-4 shadow-lg border-0 text-white"
+          style={{
+            background: 'linear-gradient(135deg, #1cb5e0 0%, #000851 100%)',
+            borderRadius: '15px',
+            overflow: 'hidden',
+          }}
           {...(props.withCharts && {
             chart: (
               <CChart
@@ -94,18 +109,27 @@ const WidgetsBrand = (props) => {
               />
             ),
           })}
-          icon={<CIcon icon={cibTwitter} height={52} className="my-4 text-white" />}
+          icon={<CIcon icon={cibTwitter} height={52} className="my-4 text-white opacity-75" />}
           values={[
-            { title: 'followers', value: '973k' },
-            { title: 'tweets', value: '1.792' },
+            {
+              title: <span className="text-white opacity-75">followers</span>,
+              value: <span className="fs-3 fw-bold text-white">973k</span>,
+            },
+            {
+              title: <span className="text-white opacity-75">tweets</span>,
+              value: <span className="fs-3 fw-bold text-white">1.792</span>,
+            },
           ]}
-          style={{
-            '--cui-card-cap-bg': '#00aced',
-          }}
         />
       </CCol>
       <CCol sm={6} xl={4} xxl={3}>
         <CWidgetStatsD
+          className="mb-4 shadow-lg border-0 text-white"
+          style={{
+            background: 'linear-gradient(135deg, #09203f 0%, #537895 100%)',
+            borderRadius: '15px',
+            overflow: 'hidden',
+          }}
           {...(props.withCharts && {
             chart: (
               <CChart
@@ -128,19 +152,27 @@ const WidgetsBrand = (props) => {
               />
             ),
           })}
-          icon={<CIcon icon={cibLinkedin} height={52} className="my-4 text-white" />}
+          icon={<CIcon icon={cibLinkedin} height={52} className="my-4 text-white opacity-75" />}
           values={[
-            { title: 'contacts', value: '500' },
-            { title: 'feeds', value: '1.292' },
+            {
+              title: <span className="text-white opacity-75">contacts</span>,
+              value: <span className="fs-3 fw-bold text-white">500</span>,
+            },
+            {
+              title: <span className="text-white opacity-75">feeds</span>,
+              value: <span className="fs-3 fw-bold text-white">1.292</span>,
+            },
           ]}
-          style={{
-            '--cui-card-cap-bg': '#4875b4',
-          }}
         />
       </CCol>
       <CCol sm={6} xl={4} xxl={3}>
         <CWidgetStatsD
-          color="warning"
+          className="mb-4 shadow-lg border-0 text-white"
+          style={{
+            background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+            borderRadius: '15px',
+            overflow: 'hidden',
+          }}
           {...(props.withCharts && {
             chart: (
               <CChart
@@ -163,10 +195,16 @@ const WidgetsBrand = (props) => {
               />
             ),
           })}
-          icon={<CIcon icon={cilCalendar} height={52} className="my-4 text-white" />}
+          icon={<CIcon icon={cilCalendar} height={52} className="my-4 text-white opacity-75" />}
           values={[
-            { title: 'events', value: '12+' },
-            { title: 'meetings', value: '4' },
+            {
+              title: <span className="text-white opacity-75">events</span>,
+              value: <span className="fs-3 fw-bold text-white">12+</span>,
+            },
+            {
+              title: <span className="text-white opacity-75">meetings</span>,
+              value: <span className="fs-3 fw-bold text-white">4</span>,
+            },
           ]}
         />
       </CCol>

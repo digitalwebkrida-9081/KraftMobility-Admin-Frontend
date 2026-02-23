@@ -8,6 +8,7 @@ import {
   CSidebarFooter,
   CSidebarHeader,
   CSidebarToggler,
+  useColorModes,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 
@@ -27,6 +28,7 @@ const AppSidebar = () => {
   const unfoldable = useSelector((state) => state.sidebarUnfoldable)
   const sidebarShow = useSelector((state) => state.sidebarShow)
   const { user, pendingCount } = useAuth()
+  const { colorMode } = useColorModes('coreui-free-react-admin-template-theme')
 
   // Get filtered navigation based on user role
   const baseNavItems = user?.role ? getFilteredNav(user.role) : []
@@ -93,7 +95,6 @@ const AppSidebar = () => {
   return (
     <CSidebar
       className="border-end"
-      colorScheme="dark"
       position="fixed"
       unfoldable={unfoldable}
       visible={sidebarShow}

@@ -19,9 +19,23 @@ const createTicket = (service, description, image) => {
   })
 }
 
-const getTickets = () => {
+const getTickets = (page, limit) => {
   const token = authService.getToken()
+  let params = {}
+  if (page && limit) {
+    params = { page, limit }
+  }
   return axios.get(API_URL, {
+    headers: {
+      Authorization: 'Bearer ' + token,
+    },
+    params,
+  })
+}
+
+const getAnalytics = () => {
+  const token = authService.getToken()
+  return axios.get(API_URL + 'analytics', {
     headers: {
       Authorization: 'Bearer ' + token,
     },
@@ -81,6 +95,7 @@ const extendTicket = (id, days) => {
 const TicketService = {
   createTicket,
   getTickets,
+  getAnalytics,
   updateTicket,
   updateTicketStatus,
   deleteTicket,

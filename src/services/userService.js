@@ -14,12 +14,17 @@ const getPendingCount = () => {
 
 const UserService = {
   getPendingCount,
-  getUsers: () => {
+  getUsers: (page, limit) => {
     const token = authService.getToken()
+    let params = {}
+    if (page && limit) {
+      params = { page, limit }
+    }
     return axios.get(API_URL, {
       headers: {
         Authorization: 'Bearer ' + token,
       },
+      params,
     })
   },
 }

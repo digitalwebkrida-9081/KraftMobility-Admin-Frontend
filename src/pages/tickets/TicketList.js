@@ -35,6 +35,10 @@ const MySwal = withReactContent(Swal)
 
 const TicketList = () => {
   const [tickets, setTickets] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const limit = 10
+
   const [userRole, setUserRole] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
 
@@ -65,7 +69,7 @@ const TicketList = () => {
   const [ratedTicketIds, setRatedTicketIds] = useState(new Set())
 
   useEffect(() => {
-    retrieveTickets()
+    retrieveTickets(currentPage)
     const user = authService.getCurrentUser()
     if (user) {
       setUserRole(user.role)
@@ -92,16 +96,18 @@ const TicketList = () => {
     }
   }, [tickets, selectedTicketId, visible])
 
-  const retrieveTickets = () => {
-    TicketService.getTickets()
+  const retrieveTickets = (page = 1) => {
+    TicketService.getTickets(page, limit)
       .then((response) => {
-        setTickets(response.data)
-        // Check for rated tickets (This is a basic implementation, ideally backend should send this info)
-        // For now, we will just keep track of what we rate in this session or we could fetch all ratings
-        // A better approach would be to have 'isRated' on the ticket object from backend.
-        // For this iteration, we will just depend on the button action or maybe fetch ratings strictly for completed tickets if needed.
-        // Let's trying fetching ratings for completed tickets to update UI
-        checkRatedTickets(response.data)
+        if (response.data && response.data.data) {
+          setTickets(response.data.data)
+          setCurrentPage(response.data.currentPage)
+          setTotalPages(response.data.totalPages)
+          checkRatedTickets(response.data.data)
+        } else {
+          setTickets(response.data)
+          checkRatedTickets(response.data)
+        }
       })
       .catch((e) => {
         console.log(e)
@@ -112,7 +118,7 @@ const TicketList = () => {
   const handleStatusChange = (id, newStatus) => {
     TicketService.updateTicketStatus(id, newStatus)
       .then(() => {
-        retrieveTickets()
+        retrieveTickets(currentPage)
         toast.success(`Ticket status updated to ${newStatus}`)
       })
       .catch((e) => {
@@ -134,7 +140,7 @@ const TicketList = () => {
       if (result.isConfirmed) {
         TicketService.deleteTicket(id)
           .then(() => {
-            retrieveTickets()
+            retrieveTickets(currentPage)
             toast.success('Ticket deleted successfully')
           })
           .catch((e) => {
@@ -179,7 +185,7 @@ const TicketList = () => {
         const days = result.value
         TicketService.extendTicket(id, days)
           .then(() => {
-            retrieveTickets()
+            retrieveTickets(currentPage)
             toast.success(`Ticket extended by ${days} days`)
           })
           .catch((e) => {
@@ -200,7 +206,7 @@ const TicketList = () => {
     TicketService.updateTicket(editingTicket.id, formData)
       .then(() => {
         setVisible(false)
-        retrieveTickets()
+        retrieveTickets(currentPage)
         toast.success('Ticket updated successfully')
       })
       .catch((e) => {
@@ -228,7 +234,7 @@ const TicketList = () => {
     TicketService.assignTicket(assignTicketId, selectedOperatorId, operatorName)
       .then(() => {
         setAssignVisible(false)
-        retrieveTickets()
+        retrieveTickets(currentPage)
         toast.success(`Ticket assigned to ${operatorName}`)
       })
       .catch((e) => {
@@ -280,7 +286,7 @@ const TicketList = () => {
     TicketService.addNote(selectedTicketId, noteText)
       .then(() => {
         setNoteText('')
-        retrieveTickets()
+        retrieveTickets(currentPage)
         toast.success('Note added successfully')
       })
       .catch((e) => {
@@ -296,25 +302,23 @@ const TicketList = () => {
   }
 
   // --- Rating Logic ---
-  const checkRatedTickets = async (tickets) => {
-    if (!tickets) return
-    const completedTickets = tickets.filter(
+  const checkRatedTickets = async (ticketsToCheck) => {
+    if (!ticketsToCheck || ticketsToCheck.length === 0) return
+    const completedTickets = ticketsToCheck.filter(
       (t) => t.status === 'Completed' && String(t.userId) === String(currentUserId),
     )
 
-    // This could be heavy if many completed tickets, but for now it ensures correctness
-    const ratedIds = new Set()
-    for (const ticket of completedTickets) {
-      try {
-        const res = await RatingService.getRatingByTicketId(ticket.id)
-        if (res.data) {
-          ratedIds.add(ticket.id)
-        }
-      } catch (e) {
-        console.error('Error checking rating', e)
+    if (completedTickets.length === 0) return
+
+    try {
+      const ticketIds = completedTickets.map((t) => t.id)
+      const res = await RatingService.checkRatedTicketsBatch(ticketIds)
+      if (res.data) {
+        setRatedTicketIds(new Set(res.data))
       }
+    } catch (e) {
+      console.error('Error checking ratings batch', e)
     }
-    setRatedTicketIds(ratedIds)
   }
 
   const openRatingModal = (ticketId) => {
@@ -504,6 +508,37 @@ const TicketList = () => {
           </CCol>
         )}
       </CRow>
+      {totalPages > 1 && (
+        <div className="d-flex justify-content-center mt-3 mb-4">
+          <CButton
+            color="primary"
+            variant="outline"
+            disabled={currentPage === 1}
+            onClick={() => {
+              setCurrentPage(currentPage - 1)
+              retrieveTickets(currentPage - 1)
+            }}
+            className="me-2"
+          >
+            Previous
+          </CButton>
+          <span className="align-self-center mx-3 fw-bold">
+            Page {currentPage} of {totalPages}
+          </span>
+          <CButton
+            color="primary"
+            variant="outline"
+            disabled={currentPage === totalPages}
+            onClick={() => {
+              setCurrentPage(currentPage + 1)
+              retrieveTickets(currentPage + 1)
+            }}
+            className="ms-2"
+          >
+            Next
+          </CButton>
+        </div>
+      )}
 
       {/* Assign Modal */}
       <CModal visible={assignVisible} onClose={() => setAssignVisible(false)}>
