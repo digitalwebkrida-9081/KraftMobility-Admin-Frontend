@@ -197,6 +197,15 @@ const TicketList = () => {
   }
 
   const openEditModal = (ticket) => {
+    if (ticket.status === 'In Progress') {
+      MySwal.fire({
+        title: 'Notice',
+        text: 'You cannot edit a ticket while it is in progress.',
+        icon: 'info',
+        confirmButtonColor: '#3085d6',
+      })
+      return
+    }
     setEditingTicket(ticket)
     setFormData({ service: ticket.service, description: ticket.description })
     setVisible(true)
@@ -441,6 +450,7 @@ const TicketList = () => {
                           size="sm"
                           onClick={() => openEditModal(ticket)}
                           title="Edit"
+                          disabled={ticket.status === 'Completed'}
                         >
                           <CIcon icon={cilPencil} />
                         </CButton>
@@ -450,6 +460,7 @@ const TicketList = () => {
                           size="sm"
                           onClick={() => handleExtend(ticket.id)}
                           title="Extend Expiry"
+                          disabled={ticket.status === 'Completed'}
                         >
                           <CIcon icon={cilClock} />
                         </CButton>
@@ -457,7 +468,7 @@ const TicketList = () => {
                     )}
 
                     {(userRole === 'Admin' ||
-                      canEdit(ticket) ||
+                      hasPermission(userRole, 'canDeleteTicket') ||
                       authService.getPermissions()['tickets']?.includes('delete')) && (
                       <CButton
                         color="danger"

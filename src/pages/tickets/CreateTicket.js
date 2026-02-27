@@ -34,7 +34,7 @@ const CreateTicket = () => {
 
     if (!canCreate) {
       toast.error('You do not have permission to create tickets.')
-      navigate('/tickets')
+      navigate('/tickets/analytics')
     }
   }, [navigate])
 
@@ -49,7 +49,7 @@ const CreateTicket = () => {
     try {
       await TicketService.createTicket(service, description, image)
       toast.success('Ticket created successfully!')
-      navigate('/tickets')
+      navigate('/tickets/analytics')
     } catch (error) {
       const resMessage =
         (error.response && error.response.data && error.response.data.message) ||

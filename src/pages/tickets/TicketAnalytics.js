@@ -51,6 +51,7 @@ import {
   cilChartPie,
   cilX,
   cilStar,
+  cilFilter,
 } from '@coreui/icons'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
@@ -100,8 +101,34 @@ const TicketAnalytics = () => {
   const [filterStatus, setFilterStatus] = useState('All')
   const [viewMode, setViewMode] = useState('grid')
 
-  const filteredTickets =
-    filterStatus === 'All' ? tickets : tickets.filter((t) => t.status === filterStatus)
+  const [filterTicketService, setFilterTicketService] = useState('All')
+  const [filterTicketCity, setFilterTicketCity] = useState('')
+  const [filterTicketSort, setFilterTicketSort] = useState('Newest')
+
+  const filteredTickets = tickets
+    .filter((t) => filterStatus === 'All' || t.status === filterStatus)
+    .filter((t) => filterTicketService === 'All' || t.service === filterTicketService)
+    .filter((t) => {
+      if (!filterTicketCity) return true
+      const userObj = t.userDetails || {}
+      const city = userObj.location || userObj.propertyAddress || ''
+      return city.toLowerCase().includes(filterTicketCity.toLowerCase())
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime()
+      const dateB = new Date(b.createdAt).getTime()
+      return filterTicketSort === 'Newest' ? dateB - dateA : dateA - dateB
+    })
+
+  const availableServices = ['All', ...new Set(tickets.map((t) => t.service || 'General Service'))]
+  const availableCities = [
+    ...new Set(
+      tickets.map((t) => {
+        const userObj = t.userDetails || {}
+        return userObj.location || userObj.propertyAddress || ''
+      }),
+    ),
+  ].filter((c) => c.trim() !== '')
 
   // Modal State
   const [currentTicketNotes, setCurrentTicketNotes] = useState([])
@@ -155,7 +182,12 @@ const TicketAnalytics = () => {
     operator: '',
     startDate: '',
     endDate: '',
+    service: 'All',
+    sort: 'Newest',
   })
+
+  const [ticketFilterModalVisible, setTicketFilterModalVisible] = useState(false)
+  const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false)
 
   const toggleCharts = () => {
     setShowCharts(!showCharts)
@@ -363,7 +395,7 @@ const TicketAnalytics = () => {
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#e55353',
-      cancelButtonColor: '#secondary',
+      cancelButtonColor: '#6c757d',
       confirmButtonText: 'Yes, delete it!',
     }).then((result) => {
       if (result.isConfirmed) {
@@ -497,6 +529,15 @@ const TicketAnalytics = () => {
   }
 
   const openEditModal = (ticket) => {
+    if (ticket.status === 'In Progress') {
+      MySwal.fire({
+        title: 'Notice',
+        text: 'You cannot edit a ticket while it is in progress.',
+        icon: 'info',
+        confirmButtonColor: '#3085d6',
+      })
+      return
+    }
     setEditingTicket(ticket)
     setFormData({ service: ticket.service, description: ticket.description })
     setEditVisible(true)
@@ -760,29 +801,43 @@ const TicketAnalytics = () => {
   })
 
   // Filter Logic
-  const filteredReviews = reviewDetails.filter((r) => {
-    // City Filter
-    if (
-      reviewFilters.city &&
-      !r.customerCity.toLowerCase().includes(reviewFilters.city.toLowerCase())
-    ) {
-      return false
-    }
-    // Operator Filter
-    if (reviewFilters.operator && String(r.operatorId) !== String(reviewFilters.operator)) {
-      return false
-    }
-    // Date Filter
-    if (reviewFilters.startDate && new Date(r.createdAt) < new Date(reviewFilters.startDate)) {
-      return false
-    }
-    if (reviewFilters.endDate) {
-      const end = new Date(reviewFilters.endDate)
-      end.setHours(23, 59, 59, 999)
-      if (new Date(r.createdAt) > end) return false
-    }
-    return true
-  })
+  const filteredReviews = reviewDetails
+    .filter((r) => {
+      // City Filter
+      if (
+        reviewFilters.city &&
+        !r.customerCity.toLowerCase().includes(reviewFilters.city.toLowerCase())
+      ) {
+        return false
+      }
+      // Operator Filter
+      if (reviewFilters.operator && String(r.operatorId) !== String(reviewFilters.operator)) {
+        return false
+      }
+      // Date Filter
+      if (reviewFilters.startDate && new Date(r.createdAt) < new Date(reviewFilters.startDate)) {
+        return false
+      }
+      if (reviewFilters.endDate) {
+        const end = new Date(reviewFilters.endDate)
+        end.setHours(23, 59, 59, 999)
+        if (new Date(r.createdAt) > end) return false
+      }
+      // Service Filter
+      if (
+        reviewFilters.service &&
+        reviewFilters.service !== 'All' &&
+        r.ticketService !== reviewFilters.service
+      ) {
+        return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime()
+      const dateB = new Date(b.createdAt).getTime()
+      return reviewFilters.sort === 'Oldest' ? dateA - dateB : dateB - dateA
+    })
 
   return (
     <div className="container-fluid px-4 fade-in">
@@ -1639,6 +1694,14 @@ const TicketAnalytics = () => {
                 </p>
               </div>
               <div className="d-flex align-items-center gap-3">
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  onClick={() => setTicketFilterModalVisible(true)}
+                  className="d-flex align-items-center gap-2"
+                >
+                  <CIcon icon={cilFilter} /> Filter & Sort
+                </CButton>
                 <CButtonGroup role="group" aria-label="View Mode">
                   <CButton
                     color={viewMode === 'list' ? 'primary' : 'secondary'}
@@ -1671,7 +1734,7 @@ const TicketAnalytics = () => {
                   <thead>
                     <tr>
                       <th style={{ paddingLeft: '1.5rem' }}>Ticket & Service</th>
-                      <th>Created By</th>
+                      {!(userRole === 'End-User' || userRole === 'User') && <th>Created By</th>}
                       <th>Assigned Operator</th>
                       <th>Status</th>
                       <th>Timeline</th>
@@ -1697,28 +1760,30 @@ const TicketAnalytics = () => {
                           </div>
                         </td>
 
-                        <td>
-                          <div className="d-flex align-items-center">
-                            <div
-                              className="avatar-circle me-2"
-                              style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}
-                            >
-                              {getInitials(item.userEmail)}
-                            </div>
-                            <div>
+                        {!(userRole === 'End-User' || userRole === 'User') && (
+                          <td>
+                            <div className="d-flex align-items-center">
                               <div
-                                className="fw-semibold text-truncate"
-                                style={{ maxWidth: '150px' }}
-                                title={item.userEmail}
+                                className="avatar-circle me-2"
+                                style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}
                               >
-                                {item.userEmail}
+                                {getInitials(item.userEmail)}
                               </div>
-                              <div className="small opacity-75">
-                                {new Date(item.createdAt).toLocaleDateString()}
+                              <div>
+                                <div
+                                  className="fw-semibold text-truncate"
+                                  style={{ maxWidth: '150px' }}
+                                  title={item.userEmail}
+                                >
+                                  {item.userEmail}
+                                </div>
+                                <div className="small opacity-75">
+                                  {new Date(item.createdAt).toLocaleDateString()}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
+                        )}
 
                         <td>
                           {item.assignedToName ? (
@@ -1852,7 +1917,7 @@ const TicketAnalytics = () => {
                             </CDropdownToggle>
                             <CDropdownMenu>
                               {(userRole === 'Admin' ||
-                                item.userId === currentUserId ||
+                                hasPermission(userRole, 'canDeleteTicket') ||
                                 authService.getPermissions()['tickets']?.includes('delete')) && (
                                 <CDropdownItem
                                   onClick={() => handleDelete(item.id)}
@@ -1876,13 +1941,19 @@ const TicketAnalytics = () => {
                                 <>
                                   <CDropdownItem
                                     onClick={() => openEditModal(item)}
-                                    style={{ cursor: 'pointer' }}
+                                    style={{
+                                      cursor: item.status === 'Completed' ? 'default' : 'pointer',
+                                    }}
+                                    disabled={item.status === 'Completed'}
                                   >
                                     <CIcon icon={cilPencil} className="me-2" /> Edit Ticket
                                   </CDropdownItem>
                                   <CDropdownItem
                                     onClick={() => handleExtend(item.id)}
-                                    style={{ cursor: 'pointer' }}
+                                    style={{
+                                      cursor: item.status === 'Completed' ? 'default' : 'pointer',
+                                    }}
+                                    disabled={item.status === 'Completed'}
                                   >
                                     <CIcon icon={cilClock} className="me-2" /> Extend Expiry
                                   </CDropdownItem>
@@ -2000,33 +2071,41 @@ const TicketAnalytics = () => {
 
                           {/* Actors Grid: Creator & Assignee */}
                           <div className="row g-2 mb-4">
-                            <div className="col-6">
-                              <p
-                                className="text-uppercase text-muted mb-2"
-                                style={{
-                                  fontSize: '0.65rem',
-                                  fontWeight: '700',
-                                  letterSpacing: '0.5px',
-                                }}
-                              >
-                                Created By
-                              </p>
-                              <div className="d-flex align-items-center gap-2">
-                                <div
-                                  className="avatar-circle flex-shrink-0"
-                                  style={{ width: '26px', height: '26px', fontSize: '0.65rem' }}
+                            {!(userRole === 'End-User' || userRole === 'User') && (
+                              <div className="col-6">
+                                <p
+                                  className="text-uppercase text-muted mb-2"
+                                  style={{
+                                    fontSize: '0.65rem',
+                                    fontWeight: '700',
+                                    letterSpacing: '0.5px',
+                                  }}
                                 >
-                                  {getInitials(item.userEmail)}
+                                  Created By
+                                </p>
+                                <div className="d-flex align-items-center gap-2">
+                                  <div
+                                    className="avatar-circle flex-shrink-0"
+                                    style={{ width: '26px', height: '26px', fontSize: '0.65rem' }}
+                                  >
+                                    {getInitials(item.userEmail)}
+                                  </div>
+                                  <span
+                                    className="text-truncate small fw-medium text-dark"
+                                    title={item.userEmail}
+                                  >
+                                    {item.userEmail.split('@')[0]}
+                                  </span>
                                 </div>
-                                <span
-                                  className="text-truncate small fw-medium text-dark"
-                                  title={item.userEmail}
-                                >
-                                  {item.userEmail.split('@')[0]}
-                                </span>
                               </div>
-                            </div>
-                            <div className="col-6 border-start ps-3">
+                            )}
+                            <div
+                              className={
+                                !(userRole === 'End-User' || userRole === 'User')
+                                  ? 'col-6 border-start ps-3'
+                                  : 'col-12'
+                              }
+                            >
                               <p
                                 className="text-uppercase text-muted mb-2"
                                 style={{
@@ -2069,21 +2148,26 @@ const TicketAnalytics = () => {
                           </div>
 
                           {/* Footer Actions Strip */}
-                          <div className="pt-3 border-top d-flex justify-content-between align-items-center mt-auto">
-                            <CButton
-                              color="primary"
-                              variant="ghost"
-                              size="sm"
-                              className="d-flex align-items-center gap-2 px-2 border-0"
-                              onClick={() => {
-                                openContentModal(item)
-                              }}
-                            >
-                              <span>View Details</span>
-                              <CIcon icon={cilDescription} size="sm" />
-                            </CButton>
-
+                          <div className="pt-3 border-top d-flex justify-content-between align-items-center mt-auto flex-wrap gap-2">
                             <div className="d-flex align-items-center gap-2">
+                              <CButton
+                                color="primary"
+                                size="sm"
+                                className="d-flex align-items-center gap-2 px-3 border-0 text-nowrap"
+                                style={{
+                                  backgroundColor: '#5856d6',
+                                  color: 'white',
+                                  borderRadius: '6px',
+                                  fontWeight: '500',
+                                }}
+                                onClick={() => {
+                                  openContentModal(item)
+                                }}
+                              >
+                                <span>View Details</span>
+                                <CIcon icon={cilDescription} size="sm" />
+                              </CButton>
+
                               {(() => {
                                 const isCompleted = item.status === 'Completed'
                                 const isOwner = String(item.userId) === String(currentUserId)
@@ -2096,18 +2180,25 @@ const TicketAnalytics = () => {
                                       color="warning"
                                       variant="outline"
                                       size="sm"
+                                      className="d-flex align-items-center gap-1 px-3 text-nowrap"
+                                      style={{
+                                        borderRadius: '6px',
+                                        fontWeight: '500',
+                                      }}
                                       onClick={() => {
                                         openRatingModal(item.id)
                                       }}
                                       title="Rate Service"
                                     >
-                                      <CIcon icon={cilStar} className="me-1" /> Rate
+                                      <CIcon icon={cilStar} size="sm" /> Rate
                                     </CButton>
                                   )
                                 }
                                 return null
                               })()}
+                            </div>
 
+                            <div className="d-flex align-items-center gap-2">
                               {/* Dedicated Actionable Status Badge Dropdown */}
                               {(() => {
                                 const canChangeStatus =
@@ -2118,7 +2209,7 @@ const TicketAnalytics = () => {
                                   <CDropdown alignment="end" direction="up">
                                     <CDropdownToggle
                                       size="sm"
-                                      className="d-flex align-items-center gap-2 border-0"
+                                      className="d-flex align-items-center gap-2 border-0 text-nowrap"
                                       style={{
                                         backgroundColor: 'rgba(var(--card-status-color-rgb), 0.12)',
                                         color: 'var(--card-status-color)',
@@ -2205,7 +2296,7 @@ const TicketAnalytics = () => {
                                 </CDropdownToggle>
                                 <CDropdownMenu>
                                   {(userRole === 'Admin' ||
-                                    item.userId === currentUserId ||
+                                    hasPermission(userRole, 'canDeleteTicket') ||
                                     authService
                                       .getPermissions()
                                       ['tickets']?.includes('delete')) && (
@@ -2225,13 +2316,21 @@ const TicketAnalytics = () => {
                                     <>
                                       <CDropdownItem
                                         onClick={() => openEditModal(item)}
-                                        style={{ cursor: 'pointer' }}
+                                        style={{
+                                          cursor:
+                                            item.status === 'Completed' ? 'default' : 'pointer',
+                                        }}
+                                        disabled={item.status === 'Completed'}
                                       >
                                         <CIcon icon={cilPencil} className="me-2" /> Edit Ticket
                                       </CDropdownItem>
                                       <CDropdownItem
                                         onClick={() => handleExtend(item.id)}
-                                        style={{ cursor: 'pointer' }}
+                                        style={{
+                                          cursor:
+                                            item.status === 'Completed' ? 'default' : 'pointer',
+                                        }}
+                                        disabled={item.status === 'Completed'}
                                       >
                                         <CIcon icon={cilClock} className="me-2" /> Extend Expiry
                                       </CDropdownItem>
@@ -2261,62 +2360,19 @@ const TicketAnalytics = () => {
 
         {/* Review Analysis Tab */}
         <CTabPane role="tabpanel" aria-labelledby="reviews-tab" visible={activeKey === 'reviews'}>
-          <CCard className="mb-4 border-0 shadow-sm">
+          <CCard className="border-0 shadow-sm mt-4">
             <CCardBody>
-              <h5 className="mb-4">Review Analysis Filters</h5>
-              <CRow className="g-3">
-                <CCol md={3}>
-                  <CFormLabel className="small">City</CFormLabel>
-                  <CFormInput
-                    placeholder="Search by City"
-                    value={reviewFilters.city}
-                    onChange={(e) => setReviewFilters({ ...reviewFilters, city: e.target.value })}
-                  />
-                </CCol>
-                <CCol md={3}>
-                  <CFormLabel className="small">Operator</CFormLabel>
-                  <CFormSelect
-                    aria-label="Filter by Operator"
-                    value={reviewFilters.operator}
-                    onChange={(e) =>
-                      setReviewFilters({ ...reviewFilters, operator: e.target.value })
-                    }
-                  >
-                    <option value="">All Operators</option>
-                    {operators.map((op) => (
-                      <option key={op.id || op._id} value={op.id || op._id}>
-                        {op.username}
-                      </option>
-                    ))}
-                  </CFormSelect>
-                </CCol>
-                <CCol md={3}>
-                  <CFormLabel className="small">Start Date</CFormLabel>
-                  <CFormInput
-                    type="date"
-                    value={reviewFilters.startDate}
-                    onChange={(e) =>
-                      setReviewFilters({ ...reviewFilters, startDate: e.target.value })
-                    }
-                  />
-                </CCol>
-                <CCol md={3}>
-                  <CFormLabel className="small">End Date</CFormLabel>
-                  <CFormInput
-                    type="date"
-                    value={reviewFilters.endDate}
-                    onChange={(e) =>
-                      setReviewFilters({ ...reviewFilters, endDate: e.target.value })
-                    }
-                  />
-                </CCol>
-              </CRow>
-            </CCardBody>
-          </CCard>
-
-          <CCard className="border-0 shadow-sm">
-            <CCardBody>
-              <h5 className="mb-4">Reviews ({filteredReviews.length})</h5>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="mb-0">Reviews ({filteredReviews.length})</h5>
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  onClick={() => setReviewFilterModalVisible(true)}
+                  className="d-flex align-items-center gap-2"
+                >
+                  <CIcon icon={cilFilter} /> Filter & Sort
+                </CButton>
+              </div>
               <div className="table-responsive">
                 <table className="table ticket-table table-hover align-middle">
                   <thead>
@@ -3048,6 +3104,174 @@ const TicketAnalytics = () => {
         <CModalFooter>
           <CButton color="secondary" onClick={() => setReviewModalVisible(false)}>
             Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Ticket Filter Modal */}
+      <CModal
+        visible={ticketFilterModalVisible}
+        onClose={() => setTicketFilterModalVisible(false)}
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle>Filter & Sort Tickets</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">Sort By</CFormLabel>
+            <CFormSelect
+              value={filterTicketSort}
+              onChange={(e) => setFilterTicketSort(e.target.value)}
+            >
+              <option value="Newest">Newest First</option>
+              <option value="Oldest">Oldest First</option>
+            </CFormSelect>
+          </div>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">Service</CFormLabel>
+            <CFormSelect
+              value={filterTicketService}
+              onChange={(e) => setFilterTicketService(e.target.value)}
+            >
+              {availableServices.map((srv, index) => (
+                <option key={index} value={srv}>
+                  {srv}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">Filter by City</CFormLabel>
+            <CFormSelect
+              value={filterTicketCity}
+              onChange={(e) => setFilterTicketCity(e.target.value)}
+            >
+              <option value="">All Cities</option>
+              {availableCities.map((city, index) => (
+                <option key={index} value={city}>
+                  {city}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={() => {
+              setFilterTicketSort('Newest')
+              setFilterTicketService('All')
+              setFilterTicketCity('')
+            }}
+          >
+            Clear
+          </CButton>
+          <CButton color="primary" onClick={() => setTicketFilterModalVisible(false)}>
+            Apply Defaults
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Review Filter Modal */}
+      <CModal
+        visible={reviewFilterModalVisible}
+        onClose={() => setReviewFilterModalVisible(false)}
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle>Review Analysis Filters</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">City</CFormLabel>
+            <CFormSelect
+              value={reviewFilters.city}
+              onChange={(e) => setReviewFilters({ ...reviewFilters, city: e.target.value })}
+            >
+              <option value="">All Cities</option>
+              {availableCities.map((city, index) => (
+                <option key={index} value={city}>
+                  {city}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">Operator</CFormLabel>
+            <CFormSelect
+              aria-label="Filter by Operator"
+              value={reviewFilters.operator}
+              onChange={(e) => setReviewFilters({ ...reviewFilters, operator: e.target.value })}
+            >
+              <option value="">All Operators</option>
+              {operators.map((op) => (
+                <option key={op.id || op._id} value={op.id || op._id}>
+                  {op.username}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+          <div className="mb-3 d-flex gap-2">
+            <div className="flex-fill">
+              <CFormLabel className="small fw-bold">Start Date</CFormLabel>
+              <CFormInput
+                type="date"
+                value={reviewFilters.startDate}
+                onChange={(e) => setReviewFilters({ ...reviewFilters, startDate: e.target.value })}
+              />
+            </div>
+            <div className="flex-fill">
+              <CFormLabel className="small fw-bold">End Date</CFormLabel>
+              <CFormInput
+                type="date"
+                value={reviewFilters.endDate}
+                onChange={(e) => setReviewFilters({ ...reviewFilters, endDate: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">Service</CFormLabel>
+            <CFormSelect
+              value={reviewFilters.service}
+              onChange={(e) => setReviewFilters({ ...reviewFilters, service: e.target.value })}
+            >
+              {availableServices.map((srv, index) => (
+                <option key={index} value={srv}>
+                  {srv}
+                </option>
+              ))}
+            </CFormSelect>
+          </div>
+          <div className="mb-3">
+            <CFormLabel className="small fw-bold">Sort By</CFormLabel>
+            <CFormSelect
+              value={reviewFilters.sort}
+              onChange={(e) => setReviewFilters({ ...reviewFilters, sort: e.target.value })}
+            >
+              <option value="Newest">Newest First</option>
+              <option value="Oldest">Oldest First</option>
+            </CFormSelect>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={() =>
+              setReviewFilters({
+                city: '',
+                operator: '',
+                startDate: '',
+                endDate: '',
+                service: 'All',
+                sort: 'Newest',
+              })
+            }
+          >
+            Clear Filters
+          </CButton>
+          <CButton color="primary" onClick={() => setReviewFilterModalVisible(false)}>
+            Apply Filters
           </CButton>
         </CModalFooter>
       </CModal>
