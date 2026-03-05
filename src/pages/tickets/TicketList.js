@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
@@ -23,7 +23,7 @@ import {
   CFormTextarea,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPencil, cilTrash, cilClock, cilImage, cilStar } from '@coreui/icons'
+import { cilPencil, cilTrash, cilClock, cilImage, cilStar, cilUser } from '@coreui/icons'
 import TicketService from '../../services/ticketService'
 import { authService } from '../../services/authService'
 import UserService from '../../services/userService'
@@ -278,7 +278,9 @@ const TicketList = () => {
   }
 
   const canUpdateStatus =
-    userRole === 'Admin' || authService.getPermissions()['tickets']?.includes('action')
+    userRole === 'Admin' ||
+    hasPermission(userRole, 'canChangeTicketStatus') ||
+    authService.getPermissions()['tickets']?.includes('action')
 
   // --- Notes Logic ---
   const openNotesModal = (ticket) => {
@@ -379,11 +381,41 @@ const TicketList = () => {
                     Expires: {new Date(ticket.expiresAt).toLocaleDateString()}
                   </small>
                 )}
-                {ticket.userEmail && (
+                {['Admin', 'Operator', 'HR'].includes(userRole) && ticket.userDetails ? (
+                  <div
+                    className="mt-2 p-2 bg-light rounded border border-info border-opacity-25"
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    <div className="fw-semibold text-info mb-1">
+                      <CIcon icon={cilUser} size="sm" className="me-1" />
+                      Customer Details
+                    </div>
+                    <div>
+                      <span className="text-muted">Name:</span>{' '}
+                      {ticket.userDetails.username || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="text-muted">Phone:</span>{' '}
+                      {ticket.userDetails.phoneNumber || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="text-muted">Email:</span>{' '}
+                      {ticket.userDetails.email || ticket.userEmail || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="text-muted">Location:</span>{' '}
+                      {ticket.userDetails.location || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="text-muted">Property Address:</span>{' '}
+                      {ticket.userDetails.propertyAddress || 'N/A'}
+                    </div>
+                  </div>
+                ) : ticket.userEmail ? (
                   <div>
                     <small className="text-muted">User: {ticket.userEmail}</small>
                   </div>
-                )}
+                ) : null}
                 {ticket.assignedToName && (
                   <div className="mt-2 text-info">
                     <small>
