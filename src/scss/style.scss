@@ -185,6 +185,13 @@ body {
     &:hover {
       box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35) !important;
     }
+
+    &.swal2-confirm-danger {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+      &:hover {
+        box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35) !important;
+      }
+    }
   }
 
   .swal2-cancel {
@@ -819,4 +826,16 @@ select,
       color: rgba(255, 255, 255, 0.87) !important;
     }
   }
+}
+
+/* Hide Spinners for Numeric Inputs (Increments/Decrements) */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

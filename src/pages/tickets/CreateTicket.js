@@ -30,7 +30,7 @@ const CreateTicket = () => {
     // Check if user has 'add' permission for 'tickets'
     // defined in backend/src/controllers/permission.controller.js as "add"
     // Restrict creation to End-Users only
-    const canCreate = !['Admin', 'Operator', 'HR'].includes(user?.role)
+    const canCreate = !['Admin', 'Field Executive', 'HR'].includes(user?.role)
 
     if (!canCreate) {
       toast.error('You do not have permission to create tickets.')

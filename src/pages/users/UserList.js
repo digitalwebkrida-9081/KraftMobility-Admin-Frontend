@@ -74,9 +74,12 @@ const UserList = () => {
       text: "You won't be able to revert this!",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#ff0000',
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Yes, delete it!',
+      customClass: {
+        confirmButton: 'swal2-confirm-danger',
+      },
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {

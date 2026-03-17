@@ -1,4 +1,5 @@
 import React from 'react'
+import { Navigate } from 'react-router-dom'
 
 const Dashboard = React.lazy(() => import('../pages/dashboard/Dashboard'))
 const Colors = React.lazy(() => import('../pages/theme/colors/Colors'))
@@ -53,7 +54,6 @@ const Widgets = React.lazy(() => import('../pages/widgets/Widgets'))
 const UserList = React.lazy(() => import('../pages/users/UserList'))
 const CreateUser = React.lazy(() => import('../pages/users/CreateUser'))
 const CreateTicket = React.lazy(() => import('../pages/tickets/CreateTicket'))
-const TicketList = React.lazy(() => import('../pages/tickets/TicketList'))
 const ModulePermissions = React.lazy(() => import('../pages/admin/ModulePermissions'))
 const ApprovalList = React.lazy(() => import('../pages/users/ApprovalList'))
 const TicketAnalytics = React.lazy(() => import('../pages/tickets/TicketAnalytics'))
@@ -108,7 +108,7 @@ const routes = [
   { path: '/users/create', name: 'Create User', element: CreateUser, roles: ['Admin'] },
   { path: '/users/edit/:id', name: 'Edit User', element: CreateUser, roles: ['Admin'] },
   { path: '/users/approvals', name: 'Approval List', element: ApprovalList, roles: ['Admin'] },
-  { path: '/tickets', name: 'Tickets', element: TicketList, exact: true },
+  { path: '/tickets', exact: true, element: () => <Navigate to="/tickets/analytics" replace /> },
   { path: '/tickets/create', name: 'Create Ticket', element: CreateTicket },
   { path: '/tickets/analytics', name: 'Ticket Analytics', element: TicketAnalytics },
   {
@@ -116,6 +116,25 @@ const routes = [
     name: 'Module Permissions',
     element: ModulePermissions,
     roles: ['Admin'],
+  },
+  {
+    path: '/cases',
+    name: 'Cases',
+    element: React.lazy(() => import('../pages/cases/CaseList')),
+    exact: true,
+    roles: ['Admin', 'HR', 'Case Manager'],
+  },
+  {
+    path: '/cases/create',
+    name: 'Initiate Case',
+    element: React.lazy(() => import('../pages/cases/CreateCase')),
+    roles: ['Admin', 'HR'],
+  },
+  {
+    path: '/cases/:id',
+    name: 'Case Details',
+    element: React.lazy(() => import('../pages/cases/CaseDetails')),
+    roles: ['Admin', 'HR', 'Case Manager'],
   },
 ]
 

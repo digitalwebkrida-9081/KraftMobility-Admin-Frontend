@@ -113,11 +113,11 @@ const TicketService = {
     )
   },
 
-  assignTicket: (id, operatorId, operatorName) => {
+  assignTicket: (id, fieldExecutiveId, fieldExecutiveName) => {
     const token = authService.getToken()
     return axios.post(
       API_URL + id + '/assign',
-      { operatorId, operatorName },
+      { fieldExecutiveId, fieldExecutiveName },
       {
         headers: {
           Authorization: 'Bearer ' + token,

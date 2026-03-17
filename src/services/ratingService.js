@@ -25,9 +25,9 @@ const getRatingByTicketId = (ticketId) => {
   })
 }
 
-const getRatingsByOperator = (operatorId) => {
+const getRatingsByFieldExecutive = (fieldExecutiveId) => {
   const token = authService.getToken()
-  return axios.get(API_URL + '/operator/' + operatorId, {
+  return axios.get(API_URL + '/field-executive/' + fieldExecutiveId, {
     headers: {
       Authorization: 'Bearer ' + token,
     },
@@ -50,7 +50,7 @@ const checkRatedTicketsBatch = (ticketIds) => {
 const RatingService = {
   createRating,
   getRatingByTicketId,
-  getRatingsByOperator,
+  getRatingsByFieldExecutive,
   checkRatedTicketsBatch,
   getAllRatings: () => {
     const token = authService.getToken()

@@ -143,7 +143,7 @@
                       className={`rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm ${
                         note.author === 'Admin'
                           ? 'bg-primary'
-                          : note.author === 'Operator'
+                          : note.author === 'Field Executive'
                             ? 'bg-info'
                             : 'bg-secondary'
                       }`}
@@ -243,7 +243,7 @@
 
             {selectedTicketContent.assignedToName && (
               <div>
-                <span className="text-muted small d-block mb-2">Assigned Operator</span>
+                <span className="text-muted small d-block mb-2">Assigned Field Executive</span>
                 <div className="d-flex align-items-center gap-3 p-2 bg-body-tertiary rounded-3 border">
                   <div
                     className="bg-info text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm"
@@ -258,7 +258,7 @@
           </div>
 
           {/* Customer Details Card (Only for authorized roles) */}
-          {['Admin', 'Operator', 'HR'].includes(userRole) && selectedTicketContent.userDetails && (
+          {['Admin', 'Field Executive', 'HR'].includes(userRole) && selectedTicketContent.userDetails && (
             <div className="bg-body rounded-4 shadow-sm border p-0 overflow-hidden">
               <div className="bg-primary bg-opacity-10 p-3 border-bottom border-primary border-opacity-25">
                 <h6

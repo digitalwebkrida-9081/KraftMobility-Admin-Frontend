@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
@@ -49,8 +49,8 @@ const TicketList = () => {
 
   // Assign Modal State
   const [assignVisible, setAssignVisible] = useState(false)
-  const [operators, setOperators] = useState([])
-  const [selectedOperatorId, setSelectedOperatorId] = useState('')
+  const [fieldExecutives, setFieldExecutives] = useState([])
+  const [selectedFieldExecutiveId, setSelectedFieldExecutiveId] = useState('')
   const [assignTicketId, setAssignTicketId] = useState(null)
 
   // Notes Modal State
@@ -78,10 +78,9 @@ const TicketList = () => {
       if (user.role === 'Admin') {
         UserService.getUsers()
           .then((res) => {
-            // Filter for operators.
-            // Ensure we handle inconsistent role naming if any, but backend says 'Operator'
-            const ops = res.data.filter((u) => u.role === 'Operator')
-            setOperators(ops)
+            // Filter for field executives.
+            const ops = res.data.filter((u) => u.role === 'Field Executive')
+            setFieldExecutives(ops)
           })
           .catch((err) => console.log(err))
       }
@@ -133,9 +132,12 @@ const TicketList = () => {
       text: "You won't be able to revert this!",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#ff0000',
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Yes, delete it!',
+      customClass: {
+        confirmButton: 'swal2-confirm-danger',
+      },
     }).then((result) => {
       if (result.isConfirmed) {
         TicketService.deleteTicket(id)
@@ -227,24 +229,26 @@ const TicketList = () => {
   // --- Assign Logic ---
   const openAssignModal = (ticket) => {
     setAssignTicketId(ticket.id)
-    setSelectedOperatorId(ticket.assignedTo || '')
+    setSelectedFieldExecutiveId(ticket.assignedTo || '')
     setAssignVisible(true)
   }
 
   const handleAssignSubmit = () => {
-    if (!selectedOperatorId) {
-      toast.error('Please select an operator')
+    if (!selectedFieldExecutiveId) {
+      toast.error('Please select a Field Executive')
       return
     }
-    // Find operator to get name
-    const operator = operators.find((o) => String(o.id || o._id) === String(selectedOperatorId))
-    const operatorName = operator ? operator.username : ''
+    // Find field executive to get name
+    const fieldExecutive = fieldExecutives.find(
+      (o) => String(o.id || o._id) === String(selectedFieldExecutiveId),
+    )
+    const fieldExecutiveName = fieldExecutive ? fieldExecutive.username : ''
 
-    TicketService.assignTicket(assignTicketId, selectedOperatorId, operatorName)
+    TicketService.assignTicket(assignTicketId, selectedFieldExecutiveId, fieldExecutiveName)
       .then(() => {
         setAssignVisible(false)
         retrieveTickets(currentPage)
-        toast.success(`Ticket assigned to ${operatorName}`)
+        toast.success(`Ticket assigned to ${fieldExecutiveName}`)
       })
       .catch((e) => {
         console.log(e)
@@ -381,7 +385,7 @@ const TicketList = () => {
                     Expires: {new Date(ticket.expiresAt).toLocaleDateString()}
                   </small>
                 )}
-                {['Admin', 'Operator', 'HR'].includes(userRole) && ticket.userDetails ? (
+                {['Admin', 'Field Executive', 'HR'].includes(userRole) && ticket.userDetails ? (
                   <div
                     className="mt-2 p-2 bg-light rounded border border-info border-opacity-25"
                     style={{ fontSize: '0.85rem' }}
@@ -468,7 +472,7 @@ const TicketList = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => openAssignModal(ticket)}
-                        title="Assign Operator"
+                        title="Assign Field Executive"
                       >
                         Assign
                       </CButton>
@@ -500,6 +504,7 @@ const TicketList = () => {
                     )}
 
                     {(userRole === 'Admin' ||
+                      userRole === 'Field Executive' ||
                       hasPermission(userRole, 'canDeleteTicket') ||
                       authService.getPermissions()['tickets']?.includes('delete')) && (
                       <CButton
@@ -586,18 +591,18 @@ const TicketList = () => {
       {/* Assign Modal */}
       <CModal visible={assignVisible} onClose={() => setAssignVisible(false)}>
         <CModalHeader onClose={() => setAssignVisible(false)}>
-          <CModalTitle>Assign Ticket to Operator</CModalTitle>
+          <CModalTitle>Assign Ticket to Field Executive</CModalTitle>
         </CModalHeader>
         <CModalBody>
           <CForm>
             <div className="mb-3">
-              <CFormLabel>Select Operator</CFormLabel>
+              <CFormLabel>Select Field Executive</CFormLabel>
               <CFormSelect
-                value={selectedOperatorId}
-                onChange={(e) => setSelectedOperatorId(e.target.value)}
+                value={selectedFieldExecutiveId}
+                onChange={(e) => setSelectedFieldExecutiveId(e.target.value)}
               >
-                <option value="">Select an Operator</option>
-                {operators.map((op) => (
+                <option value="">Select a Field Executive</option>
+                {fieldExecutives.map((op) => (
                   <option key={op.id || op._id} value={op.id || op._id}>
                     {op.username}
                   </option>
@@ -675,7 +680,7 @@ const TicketList = () => {
             )}
           </div>
 
-          {(userRole === 'Admin' || userRole === 'Operator') && (
+          {(userRole === 'Admin' || userRole === 'Field Executive') && (
             <CForm onSubmit={handleAddNote}>
               <div className="mb-3">
                 <CFormLabel>Add Note</CFormLabel>

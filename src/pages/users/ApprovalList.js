@@ -71,9 +71,12 @@ const ApprovalList = () => {
       text: "This will delete the user request. You won't be able to revert this!",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#ff0000',
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Yes, reject it!',
+      customClass: {
+        confirmButton: 'swal2-confirm-danger',
+      },
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {

@@ -187,10 +187,11 @@ const CreateUser = () => {
                   value={formData.role}
                   onChange={handleChange}
                 >
-                  <option value="Admin">Admin</option>
-                  <option value="Operator">Operator</option>
-                  <option value="HR">HR</option>
-                  <option value="End-User">End-User</option>
+                   <option value="Admin">Admin</option>
+                   <option value="Case Manager">Case Manager</option>
+                   <option value="Field Executive">Field Executive</option>
+                   <option value="HR">HR</option>
+                   <option value="End-User">End-User</option>
                 </CFormSelect>
               </div>
               <CButton type="submit" color="primary">

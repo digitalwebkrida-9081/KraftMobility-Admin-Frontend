@@ -65,8 +65,13 @@ const AppSidebar = () => {
           },
           {
             component: CNavItem,
-            name: 'Operator',
-            to: '/users?role=Operator',
+            name: 'Case Manager',
+            to: '/users?role=Case Manager',
+          },
+          {
+            component: CNavItem,
+            name: 'Field Executive',
+            to: '/users?role=Field Executive',
           },
           {
             component: CNavItem,

@@ -6,9 +6,10 @@
 
 export const ROLES = {
   ADMIN: 'Admin',
-  OPERATOR: 'Operator',
+  FIELD_EXECUTIVE: 'Field Executive',
   HR: 'HR',
   END_USER: 'End-User',
+  CASE_MANAGER: 'Case Manager',
 }
 
 export const rolePermissions = {
@@ -20,16 +21,17 @@ export const rolePermissions = {
     canAssignTicket: true,
     canViewAnalytics: true,
     canManageUsers: true,
-    canExtendTicketTime: false, // Operators extend time, not admins
+    canExtendTicketTime: false, // Field Executives extend time, not admins
     canAddNotes: true,
     canViewNotes: true,
     canChangeTicketStatus: true,
     canViewDashboard: true,
     canRateTicket: false, // Admin cannot rate
     canViewRatings: true, // Admin can view ratings
+    canViewCases: true,
   },
-  [ROLES.OPERATOR]: {
-    canCreateTicket: false, // Operators work on tickets, don't create them
+  [ROLES.FIELD_EXECUTIVE]: {
+    canCreateTicket: false, // Field Executives work on tickets, don't create them
     canViewAllTickets: true,
     canEditTicket: false, // Can edit ticket content while working on it
     canDeleteTicket: false, // Cannot delete
@@ -41,8 +43,8 @@ export const rolePermissions = {
     canViewNotes: true,
     canChangeTicketStatus: true, // Can change status of their tickets
     canViewDashboard: true,
-    canRateTicket: false, // Operator cannot rate
-    canViewRatings: true, // Operator can view ratings
+    canRateTicket: false, // Field Executive cannot rate
+    canViewRatings: true, // Field Executive can view ratings
   },
   [ROLES.HR]: {
     canCreateTicket: false, // HR doesn't create tickets
@@ -59,6 +61,7 @@ export const rolePermissions = {
     canViewDashboard: true,
     canRateTicket: false, // HR cannot rate
     canViewRatings: true, // HR can view ratings
+    canViewCases: true, // Specific permissions for Cases module
   },
   [ROLES.END_USER]: {
     canCreateTicket: true, // End users create tickets
@@ -75,6 +78,24 @@ export const rolePermissions = {
     canViewDashboard: true,
     canRateTicket: true, // End Users CAN rate
     canViewRatings: true, // End Users can view their own ratings
+    canViewCases: false,
+  },
+  [ROLES.CASE_MANAGER]: {
+    canCreateTicket: false,
+    canViewAllTickets: false,
+    canEditTicket: false,
+    canDeleteTicket: false,
+    canAssignTicket: false,
+    canViewAnalytics: false,
+    canManageUsers: false,
+    canExtendTicketTime: false,
+    canAddNotes: false,
+    canViewNotes: false,
+    canChangeTicketStatus: false,
+    canViewDashboard: true,
+    canRateTicket: false,
+    canViewRatings: false,
+    canViewCases: true,
   },
 }
 

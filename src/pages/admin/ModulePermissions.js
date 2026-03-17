@@ -22,10 +22,10 @@ import { toast } from 'react-toastify'
 const ModulePermissions = () => {
   const [modules, setModules] = useState([])
   const [selectedModule, setSelectedModule] = useState('')
-  const [permissions, setPermissions] = useState([]) // [{ role: 'Operator', actions: [] }]
+  const [permissions, setPermissions] = useState([]) // [{ role: 'Field Executive', actions: [] }]
   const [moduleConfig, setModuleConfig] = useState(null) // { name: 'tickets', actions: [...] }
   const [loading, setLoading] = useState(false)
-  const [roles] = useState(['Operator', 'HR', 'End-User']) // Admin has all permissions by default
+  const [roles] = useState(['Field Executive', 'HR', 'End-User']) // Admin has all permissions by default
 
   useEffect(() => {
     fetchModules()

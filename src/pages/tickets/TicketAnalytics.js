@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CButton,
@@ -142,8 +142,8 @@ const TicketAnalytics = () => {
 
   // Assign Modal State
   const [assignVisible, setAssignVisible] = useState(false)
-  const [operators, setOperators] = useState([])
-  const [selectedOperatorId, setSelectedOperatorId] = useState('')
+  const [fieldExecutives, setFieldExecutives] = useState([])
+  const [selectedFieldExecutiveId, setSelectedFieldExecutiveId] = useState('')
   const [assignTicketId, setAssignTicketId] = useState(null)
 
   const [userRole, setUserRole] = useState('')
@@ -179,7 +179,7 @@ const TicketAnalytics = () => {
   const [allRatings, setAllRatings] = useState([])
   const [reviewFilters, setReviewFilters] = useState({
     city: '',
-    operator: '',
+    fieldExecutive: '',
     startDate: '',
     endDate: '',
     service: 'All',
@@ -223,8 +223,8 @@ const TicketAnalytics = () => {
       if (user.role === 'Admin' || user.role === 'HR') {
         UserService.getUsers()
           .then((res) => {
-            const ops = res.data.filter((u) => u.role === 'Operator')
-            setOperators(ops)
+            const ops = res.data.filter((u) => u.role === 'Field Executive')
+            setFieldExecutives(ops)
           })
           .catch((err) => console.log(err))
       }
@@ -242,9 +242,9 @@ const TicketAnalytics = () => {
   }
 
   const isResponded = (ticket) => {
-    // Check if any note author is 'Admin' or 'Operator'
+    // Check if any note author is 'Admin' or 'Field Executive'
     if (!ticket.notes || ticket.notes.length === 0) return false
-    return ticket.notes.some((n) => n.author === 'Admin' || n.author === 'Operator')
+    return ticket.notes.some((n) => n.author === 'Admin' || n.author === 'Field Executive')
   }
 
   const getBadgeClass = (status) => {
@@ -394,9 +394,12 @@ const TicketAnalytics = () => {
       text: "You won't be able to revert this!",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#e55353',
+      confirmButtonColor: '#ff0000',
       cancelButtonColor: '#6c757d',
       confirmButtonText: 'Yes, delete it!',
+      customClass: {
+        confirmButton: 'swal2-confirm-danger',
+      },
     }).then((result) => {
       if (result.isConfirmed) {
         TicketService.deleteTicket(id)
@@ -414,23 +417,25 @@ const TicketAnalytics = () => {
 
   const openAssignModal = (ticket) => {
     setAssignTicketId(ticket.id)
-    setSelectedOperatorId(ticket.assignedTo || '')
+    setSelectedFieldExecutiveId(ticket.assignedTo || '')
     setAssignVisible(true)
   }
 
   const handleAssignSubmit = () => {
-    if (!selectedOperatorId) {
-      toast.error('Please select an operator')
+    if (!selectedFieldExecutiveId) {
+      toast.error('Please select a Field Executive')
       return
     }
-    const operator = operators.find((o) => String(o.id || o._id) === String(selectedOperatorId))
-    const operatorName = operator ? operator.username : ''
+    const fieldExecutive = fieldExecutives.find(
+      (o) => String(o.id || o._id) === String(selectedFieldExecutiveId),
+    )
+    const fieldExecutiveName = fieldExecutive ? fieldExecutive.username : ''
 
-    TicketService.assignTicket(assignTicketId, selectedOperatorId, operatorName)
+    TicketService.assignTicket(assignTicketId, selectedFieldExecutiveId, fieldExecutiveName)
       .then(() => {
         setAssignVisible(false)
         retrieveTickets()
-        toast.success(`Ticket assigned to ${operatorName}`)
+        toast.success(`Ticket assigned to ${fieldExecutiveName}`)
       })
       .catch((e) => {
         console.log(e)
@@ -781,7 +786,7 @@ const TicketAnalytics = () => {
   const reviewDetails = allRatings.map((rating) => {
     const ticket = tickets.find((t) => String(t.id) === String(rating.ticketId))
     const user = ticket ? ticket.userDetails : null
-    const operator = operators.find((op) => String(op.id || op._id) === String(ticket?.assignedTo))
+    const fieldExecutive = fieldExecutives.find((fe) => String(fe.id || fe._id) === String(ticket?.assignedTo))
     return {
       ...rating,
       ticketService: ticket?.service || 'Unknown',
@@ -792,10 +797,10 @@ const TicketAnalytics = () => {
       customerCity: user?.location || user?.propertyAddress || 'Unknown',
       customerLocation: user?.location || 'N/A',
       customerPropertyAddress: user?.propertyAddress || 'N/A',
-      operatorName: ticket?.assignedToName || 'Unassigned',
-      operatorId: ticket?.assignedTo || 'N/A', // Add operatorId
-      operatorEmail: operator?.email || 'N/A',
-      operatorPhone: operator?.phoneNumber || 'N/A',
+      fieldExecutiveName: ticket?.assignedToName || 'Unassigned',
+      fieldExecutiveId: ticket?.assignedTo || 'N/A', // Add fieldExecutiveId
+      fieldExecutiveEmail: fieldExecutive?.email || 'N/A',
+      fieldExecutivePhone: fieldExecutive?.phoneNumber || 'N/A',
       ticketId: rating.ticketId,
       ratingId: rating._id || rating.id,
       createdAt: rating.createdAt,
@@ -812,8 +817,8 @@ const TicketAnalytics = () => {
       ) {
         return false
       }
-      // Operator Filter
-      if (reviewFilters.operator && String(r.operatorId) !== String(reviewFilters.operator)) {
+      // Field Executive Filter
+      if (reviewFilters.fieldExecutive && String(r.fieldExecutiveId) !== String(reviewFilters.fieldExecutive)) {
         return false
       }
       // Date Filter
@@ -1279,7 +1284,7 @@ const TicketAnalytics = () => {
                         </h2>
                         <p className="small mb-0" style={{ color: 'rgba(255,255,255,0.6)' }}>
                           {analyticsInsights.unassignedCount > 0
-                            ? 'Awaiting operator assignment'
+                            ? 'Awaiting field executive assignment'
                             : 'All tickets assigned'}
                         </p>
                       </div>
@@ -1737,7 +1742,7 @@ const TicketAnalytics = () => {
                     <tr>
                       <th style={{ paddingLeft: '1.5rem' }}>Ticket & Service</th>
                       {!(userRole === 'End-User' || userRole === 'User') && <th>Created By</th>}
-                      <th>Assigned Operator</th>
+                      <th>Assigned Field Executive</th>
                       <th>Status</th>
                       <th>Timeline</th>
                       <th className="text-center">Details</th>
@@ -1941,7 +1946,7 @@ const TicketAnalytics = () => {
                                   )}
                                   {userRole === 'Admin' && (
                                     <CDropdownItem onClick={() => openAssignModal(item)}>
-                                      <CIcon icon={cilUser} className="me-2" /> Assign Operator
+                                      <CIcon icon={cilUser} className="me-2" /> Assign Field Executive
                                     </CDropdownItem>
                                   )}
                                   {/* <CDropdownItem
@@ -2365,7 +2370,7 @@ const TicketAnalytics = () => {
                                       )}
                                       {userRole === 'Admin' && (
                                         <CDropdownItem onClick={() => openAssignModal(item)}>
-                                          <CIcon icon={cilUser} className="me-2" /> Assign Operator
+                                          <CIcon icon={cilUser} className="me-2" /> Assign Field Executive
                                         </CDropdownItem>
                                       )}
                                       {String(item.userId) === String(currentUserId) && (
@@ -2467,7 +2472,7 @@ const TicketAnalytics = () => {
                           </td>
                           <td>
                             <div className="d-flex align-items-center gap-2">
-                              {review.operatorName !== 'Unassigned' && (
+                              {review.fieldExecutiveName && review.fieldExecutiveName !== 'Unassigned' && (
                                 <div
                                   className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
                                   style={{
@@ -2477,10 +2482,10 @@ const TicketAnalytics = () => {
                                     fontSize: '10px',
                                   }}
                                 >
-                                  {review.operatorName.substring(0, 2).toUpperCase()}
+                                  {review.fieldExecutiveName.substring(0, 2).toUpperCase()}
                                 </div>
                               )}
-                              <span>{review.operatorName}</span>
+                              <span>{review.fieldExecutiveName}</span>
                             </div>
                           </td>
                           <td>
@@ -2703,7 +2708,7 @@ const TicketAnalytics = () => {
                               className={`rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm ${
                                 note.author === 'Admin'
                                   ? 'bg-primary'
-                                  : note.author === 'Operator'
+                                  : note.author === 'Field Executive'
                                     ? 'bg-info'
                                     : 'bg-secondary'
                               }`}
@@ -2815,7 +2820,7 @@ const TicketAnalytics = () => {
 
                     {selectedTicketContent.assignedToName && (
                       <div>
-                        <span className="text-muted small d-block mb-2">Assigned Operator</span>
+                        <span className="text-muted small d-block mb-2">Assigned Field Executive</span>
                         <div className="d-flex align-items-center gap-3 p-2 bg-body-tertiary rounded-3 border">
                           <div
                             className="bg-info text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm"
@@ -2832,7 +2837,7 @@ const TicketAnalytics = () => {
                   </div>
 
                   {/* Customer Details Card (Only for authorized roles) */}
-                  {['Admin', 'Operator', 'HR'].includes(userRole) &&
+                  {['Admin', 'Field Executive', 'HR'].includes(userRole) &&
                     selectedTicketContent.userDetails && (
                       <div className="bg-body rounded-4 shadow-sm border p-0 overflow-hidden">
                         <div className="bg-primary bg-opacity-10 p-3 border-bottom border-primary border-opacity-25">
@@ -2931,26 +2936,26 @@ const TicketAnalytics = () => {
       {/* Assign Modal */}
       <CModal visible={assignVisible} onClose={() => setAssignVisible(false)} alignment="center">
         <CModalHeader onClose={() => setAssignVisible(false)}>
-          <CModalTitle>Assign Operator</CModalTitle>
+          <CModalTitle>Assign Field Executive</CModalTitle>
         </CModalHeader>
         <CModalBody>
           <CForm>
             <div className="mb-3">
-              <CFormLabel className="fw-bold">Select Operator</CFormLabel>
+              <CFormLabel className="fw-bold">Select Field Executive</CFormLabel>
               <CFormSelect
                 size="lg"
-                value={selectedOperatorId}
-                onChange={(e) => setSelectedOperatorId(e.target.value)}
+                value={selectedFieldExecutiveId}
+                onChange={(e) => setSelectedFieldExecutiveId(e.target.value)}
               >
-                <option value="">Select an Operator</option>
-                {operators.map((op) => (
-                  <option key={op.id || op._id} value={op.id || op._id}>
-                    {op.username}
+                <option value="">Select a Field Executive</option>
+                {fieldExecutives.map((fe) => (
+                  <option key={fe.id || fe._id} value={fe.id || fe._id}>
+                    {fe.username}
                   </option>
                 ))}
               </CFormSelect>
               <div className="form-text mt-2">
-                The selected operator will be notified and assigned ownership of this ticket.
+                The selected field executive will be notified and assigned ownership of this ticket.
               </div>
             </div>
           </CForm>
@@ -3233,13 +3238,13 @@ const TicketAnalytics = () => {
               <CCol md={6}>
                 <div className="p-3 border rounded-3 h-100 bg-body-secondary">
                   <h6 className="text-uppercase small fw-bold mb-3 text-secondary">
-                    Operator Details
+                    Field Executive Details
                   </h6>
                   <div className="d-flex flex-column gap-2 text-body">
                     <div>
-                      <span className="text-secondary small d-block">Assigned Operator</span>
+                      <span className="text-secondary small d-block">Assigned Field Executive</span>
                       <div className="d-flex align-items-center gap-2 mt-1">
-                        {selectedReview.operatorName !== 'Unassigned' && (
+                        {selectedReview.fieldExecutiveName !== 'Unassigned' && (
                           <div
                             className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold bg-primary"
                             style={{
@@ -3248,20 +3253,20 @@ const TicketAnalytics = () => {
                               fontSize: '10px',
                             }}
                           >
-                            {selectedReview.operatorName.substring(0, 2).toUpperCase()}
+                            {selectedReview.fieldExecutiveName.substring(0, 2).toUpperCase()}
                           </div>
                         )}
-                        <span className="fw-medium">{selectedReview.operatorName}</span>
+                        <span className="fw-medium">{selectedReview.fieldExecutiveName}</span>
                       </div>
                     </div>
                     <div>
-                      <span className="text-secondary small d-block">Operator ID</span>
-                      <span className="fw-medium">{selectedReview.operatorId || 'N/A'}</span>
+                      <span className="text-secondary small d-block">Field Executive ID</span>
+                      <span className="fw-medium">{selectedReview.fieldExecutiveId || 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-secondary small d-block">Contact Info</span>
-                      <span className="fw-medium d-block">{selectedReview.operatorEmail}</span>
-                      <span className="fw-medium d-block">{selectedReview.operatorPhone}</span>
+                      <span className="fw-medium d-block">{selectedReview.fieldExecutiveEmail}</span>
+                      <span className="fw-medium d-block">{selectedReview.fieldExecutivePhone}</span>
                     </div>
                   </div>
                 </div>
@@ -3425,16 +3430,16 @@ const TicketAnalytics = () => {
             </CFormSelect>
           </div>
           <div className="mb-3">
-            <CFormLabel className="small fw-bold">Operator</CFormLabel>
+            <CFormLabel className="small fw-bold">Field Executive</CFormLabel>
             <CFormSelect
-              aria-label="Filter by Operator"
-              value={reviewFilters.operator}
-              onChange={(e) => setReviewFilters({ ...reviewFilters, operator: e.target.value })}
+              aria-label="Filter by Field Executive"
+              value={reviewFilters.fieldExecutive}
+              onChange={(e) => setReviewFilters({ ...reviewFilters, fieldExecutive: e.target.value })}
             >
-              <option value="">All Operators</option>
-              {operators.map((op) => (
-                <option key={op.id || op._id} value={op.id || op._id}>
-                  {op.username}
+              <option value="">All Field Executives</option>
+              {fieldExecutives.map((fe) => (
+                <option key={fe.id || fe._id} value={fe.id || fe._id}>
+                  {fe.username}
                 </option>
               ))}
             </CFormSelect>
@@ -3487,7 +3492,7 @@ const TicketAnalytics = () => {
             onClick={() =>
               setReviewFilters({
                 city: '',
-                operator: '',
+                fieldExecutive: '',
                 startDate: '',
                 endDate: '',
                 service: 'All',
