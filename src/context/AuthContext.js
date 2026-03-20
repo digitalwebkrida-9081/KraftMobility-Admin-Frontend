@@ -63,8 +63,8 @@ export const AuthProvider = ({ children }) => {
     return await authService.createUser(userData)
   }
 
-  const getUsers = async (page, limit) => {
-    return await authService.getUsers(page, limit)
+  const getUsers = async (page, limit, role, status) => {
+    return await authService.getUsers(page, limit, role, status)
   }
 
   const updateUser = async (id, userData) => {

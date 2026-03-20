@@ -125,6 +125,18 @@ const routes = [
     roles: ['Admin', 'HR', 'Case Manager'],
   },
   {
+    path: '/cases/analytics',
+    name: 'Case Analytics',
+    element: React.lazy(() => import('../pages/cases/CaseAnalytics')),
+    roles: ['Admin', 'HR', 'Case Manager'],
+  },
+  {
+    path: '/cases/list',
+    name: 'Case List',
+    element: React.lazy(() => import('../pages/cases/CaseList')),
+    roles: ['Admin', 'HR', 'Case Manager'],
+  },
+  {
     path: '/cases/create',
     name: 'Initiate Case',
     element: React.lazy(() => import('../pages/cases/CreateCase')),

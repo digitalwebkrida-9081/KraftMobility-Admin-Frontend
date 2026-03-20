@@ -23,7 +23,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilHistory } from '@coreui/icons'
 import axios from 'axios'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
@@ -36,6 +36,10 @@ const CaseList = () => {
   const [selectedTimelineCase, setSelectedTimelineCase] = useState(null)
   const [showTimeline, setShowTimeline] = useState(false)
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const statusFilter = searchParams.get('status')
+  const assignedFilter = searchParams.get('assigned')
 
   // In Vite: process.env is import.meta.env
   // .env has: VITE_API_URL=https://.../api
@@ -65,6 +69,12 @@ const CaseList = () => {
       setLoading(false)
     }
   }
+
+  const filteredCases = cases.filter((c) => {
+    if (statusFilter && c.status !== statusFilter) return false
+    if (assignedFilter === 'unassigned' && c.assignedCaseManager) return false
+    return true
+  })
 
   const handleDelete = async (caseId) => {
     MySwal.fire({
@@ -140,16 +150,33 @@ const CaseList = () => {
       <CCol xs={12}>
         <CCard className="mb-4">
           <CCardHeader className="d-flex justify-content-between align-items-center">
-            <strong>Case Management</strong>
-            {isHR || isAdmin ? (
-              <CButton color="primary" size="sm" onClick={() => navigate('/cases/create')}>
-                + Initiate New Case
+            <div>
+              <strong>Case Management</strong>
+              {(statusFilter || assignedFilter) && (
+                <CBadge color="info" className="ms-2">
+                  Filtered: {statusFilter || (assignedFilter === 'unassigned' ? 'Unassigned' : '')}
+                </CBadge>
+              )}
+            </div>
+            <div className="d-flex gap-2">
+              {(statusFilter || assignedFilter) && (
+                <CButton color="secondary" variant="outline" size="sm" onClick={() => setSearchParams({})}>
+                  Clear Filters
+                </CButton>
+              )}
+              <CButton color="info" variant="outline" size="sm" onClick={() => navigate('/cases/analytics')}>
+                📊 Analytics Dashboard
               </CButton>
-            ) : null}
+              {isHR || isAdmin ? (
+                <CButton color="primary" size="sm" onClick={() => navigate('/cases/create')}>
+                  + Initiate New Case
+                </CButton>
+              ) : null}
+            </div>
           </CCardHeader>
           <CCardBody>
-            {cases.length === 0 ? (
-              <p className="text-center text-muted">No cases found.</p>
+            {filteredCases.length === 0 ? (
+              <p className="text-center text-muted">No cases found matching the criteria.</p>
             ) : (
               <CTable hover responsive align="middle">
                 <CTableHead color="light">
@@ -164,7 +191,7 @@ const CaseList = () => {
                   </CTableRow>
                 </CTableHead>
                 <CTableBody>
-                  {cases.map((caseItem) => (
+                  {filteredCases.map((caseItem) => (
                     <CTableRow key={caseItem.id}>
                       <CTableDataCell>
                         <strong>{caseItem.assigneeName}</strong>

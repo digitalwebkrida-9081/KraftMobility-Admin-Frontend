@@ -50,13 +50,18 @@ const UserList = () => {
 
   const fetchUsers = async (page = 1) => {
     try {
-      const data = await getUsers(page, limit)
+      const data = await getUsers(page, limit, roleFilter, 'approved')
       if (data.data) {
         setUsers(data.data)
-        setCurrentPage(data.currentPage)
         setTotalPages(data.totalPages)
+        // Only set currentPage if actually different to avoid extra renders
+        if (data.currentPage !== currentPage) {
+          setCurrentPage(data.currentPage)
+        }
       } else {
         setUsers(data)
+        setTotalPages(1)
+        setCurrentPage(1)
       }
     } catch (error) {
       console.error('Failed to fetch users', error)
@@ -64,9 +69,13 @@ const UserList = () => {
     }
   }
 
+  // Effect to reset page and fetch when role changes
   useEffect(() => {
-    fetchUsers(currentPage)
-  }, [getUsers])
+    setCurrentPage(1)
+    fetchUsers(1)
+  }, [roleFilter])
+
+  // Initial fetch removed from original useEffect to avoid double calls with roleFilter effect
 
   const handleDelete = async (id) => {
     MySwal.fire({
@@ -109,11 +118,8 @@ const UserList = () => {
     }
   }
 
-  const filteredUsers = users.filter((user) => {
-    const roleMatch = roleFilter ? user.role === roleFilter : true
-    const statusMatch = user.status === 'approved'
-    return roleMatch && statusMatch
-  })
+  // Use users directly since filtering is now done on backend
+  const displayUsers = users 
 
   return (
     <CRow>
@@ -143,7 +149,7 @@ const UserList = () => {
                 </CTableRow>
               </CTableHead>
               <CTableBody>
-                {filteredUsers.map((user) => (
+                {displayUsers.map((user) => (
                   <CTableRow key={user.id}>
                     <CTableDataCell>{user.username}</CTableDataCell>
                     <CTableDataCell>{user.email}</CTableDataCell>

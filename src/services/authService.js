@@ -77,11 +77,17 @@ export const authService = {
     return null
   },
 
-  getUsers: async (page, limit) => {
+  getUsers: async (page, limit, role, status) => {
     const token = authService.getToken()
     let url = `${API_URL}/users`
-    if (page && limit) {
-      url += `?page=${page}&limit=${limit}`
+    const params = new URLSearchParams()
+    if (page) params.append('page', page)
+    if (limit) params.append('limit', limit)
+    if (role) params.append('role', role)
+    if (status) params.append('status', status)
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`
     }
     const response = await fetch(url, {
       headers: {

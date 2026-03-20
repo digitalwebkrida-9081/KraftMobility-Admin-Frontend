@@ -36,7 +36,14 @@ const _nav = [
     component: CNavItem,
     name: 'Cases',
     to: '/cases',
-    icon: <CIcon icon={cilNotes} customClassName="nav-icon" />, // using cilNotes instead of missing icon
+    icon: <CIcon icon={cilNotes} customClassName="nav-icon" />,
+    permission: 'canViewCases',
+  },
+  {
+    component: CNavItem,
+    name: 'Case Analytics',
+    to: '/cases/analytics',
+    icon: <CIcon icon={cilChartPie} customClassName="nav-icon" />,
     permission: 'canViewCases',
   },
 ]

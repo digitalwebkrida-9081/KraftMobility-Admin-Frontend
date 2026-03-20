@@ -40,9 +40,10 @@ const ApprovalList = () => {
 
   const fetchUsers = async () => {
     try {
-      const data = await getUsers()
-      // Filter only pending users
-      const pendingUsers = data.filter((user) => user.status === 'pending')
+      // Use backend filter for 'pending' status
+      const data = await getUsers(null, null, null, 'pending')
+      // If paginated format is returned (unlikely here but for safety)
+      const pendingUsers = data.data || data
       setUsers(pendingUsers)
     } catch (error) {
       console.error('Failed to fetch users', error)
