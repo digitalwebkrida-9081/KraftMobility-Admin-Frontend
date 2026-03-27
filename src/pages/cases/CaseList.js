@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { cilHistory, cilSearch, cilTrash, cilChartPie, cilPlus, cilX, cilFilter } from '@coreui/icons'
+import CIcon from '@coreui/icons-react'
 import {
   CCard,
   CCardBody,
@@ -19,9 +21,8 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
+  CTooltip,
 } from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilHistory } from '@coreui/icons'
 import axios from 'axios'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
@@ -160,16 +161,36 @@ const CaseList = () => {
             </div>
             <div className="d-flex gap-2">
               {(statusFilter || assignedFilter) && (
-                <CButton color="secondary" variant="outline" size="sm" onClick={() => setSearchParams({})}>
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchParams({})}
+                  className="d-flex align-items-center"
+                >
+                  <CIcon icon={cilX} className="me-1" />
                   Clear Filters
                 </CButton>
               )}
-              <CButton color="info" variant="outline" size="sm" onClick={() => navigate('/cases/analytics')}>
-                📊 Analytics Dashboard
+              <CButton
+                color="info"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/cases/analytics')}
+                className="d-flex align-items-center"
+              >
+                <CIcon icon={cilChartPie} className="me-1" />
+                Analytics Dashboard
               </CButton>
               {isHR || isAdmin ? (
-                <CButton color="primary" size="sm" onClick={() => navigate('/cases/create')}>
-                  + Initiate New Case
+                <CButton
+                  color="primary"
+                  size="sm"
+                  onClick={() => navigate('/cases/create')}
+                  className="d-flex align-items-center"
+                >
+                  <CIcon icon={cilPlus} className="me-1" />
+                  Initiate New Case
                 </CButton>
               ) : null}
             </div>
@@ -182,12 +203,14 @@ const CaseList = () => {
                 <CTableHead color="light">
                   <CTableRow>
                     <CTableHeaderCell>Assignee Name</CTableHeaderCell>
-                    <CTableHeaderCell>Entity</CTableHeaderCell>
+                    <CTableHeaderCell>Billing Entity</CTableHeaderCell>
                     <CTableHeaderCell>From &rarr; To</CTableHeaderCell>
                     <CTableHeaderCell>Status</CTableHeaderCell>
                     <CTableHeaderCell>Case Manager</CTableHeaderCell>
                     <CTableHeaderCell>Created Date</CTableHeaderCell>
-                    <CTableHeaderCell>Actions</CTableHeaderCell>
+                    <CTableHeaderCell className="text-center" style={{ width: '120px' }}>
+                      Actions
+                    </CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
                 <CTableBody>
@@ -224,35 +247,41 @@ const CaseList = () => {
                         {new Date(caseItem.createdAt).toLocaleDateString()}
                       </CTableDataCell>
                       <CTableDataCell>
-                        <div className="d-flex gap-2">
-                          <CButton
-                            color="info"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/cases/${caseItem.id}`)}
-                          >
-                            View Details
-                          </CButton>
-                          <CButton
-                            color="info"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedTimelineCase(caseItem)
-                              setShowTimeline(true)
-                            }}
-                          >
-                            <CIcon icon={cilHistory} title="Timeline" />
-                          </CButton>
-                          {isAdmin && (
+                        <div className="d-flex gap-1 justify-content-center">
+                          <CTooltip content="View Details">
                             <CButton
-                              color="danger"
-                              variant="outline"
+                              color="info"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => handleDelete(caseItem.id)}
+                              onClick={() => navigate(`/cases/${caseItem.id}`)}
                             >
-                              Delete
+                              <CIcon icon={cilSearch} />
                             </CButton>
+                          </CTooltip>
+                          <CTooltip content="Case Timeline">
+                            <CButton
+                              color="secondary"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTimelineCase(caseItem)
+                                setShowTimeline(true)
+                              }}
+                            >
+                              <CIcon icon={cilHistory} />
+                            </CButton>
+                          </CTooltip>
+                          {isAdmin && (
+                            <CTooltip content="Delete Case">
+                              <CButton
+                                color="danger"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(caseItem.id)}
+                              >
+                                <CIcon icon={cilTrash} />
+                              </CButton>
+                            </CTooltip>
                           )}
                         </div>
                       </CTableDataCell>

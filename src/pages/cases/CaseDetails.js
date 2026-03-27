@@ -29,7 +29,7 @@ import {
   CModalFooter,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilCheckCircle, cilHistory } from '@coreui/icons'
+import { cilCheckCircle, cilHistory, cilTrash, cilList } from '@coreui/icons'
 import axios from 'axios'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
@@ -458,10 +458,20 @@ const CaseDetails = () => {
                 size="sm"
                 variant="outline"
                 onClick={() => setShowTimeline(true)}
-                className="me-2"
+                className="me-2 d-inline-flex align-items-center"
               >
-                <CIcon icon={cilHistory} className="me-2" />
+                <CIcon icon={cilHistory} className="me-1" />
                 Timeline
+              </CButton>
+              <CButton
+                color="secondary"
+                size="sm"
+                variant="outline"
+                onClick={() => navigate('/cases')}
+                className="me-2 d-inline-flex align-items-center"
+              >
+                <CIcon icon={cilList} className="me-1" />
+                Back to List
               </CButton>
               {isCaseManagerOrAdmin && (
                 <CFormSelect
@@ -478,7 +488,14 @@ const CaseDetails = () => {
                 </CFormSelect>
               )}
               {isAdmin && (
-                <CButton color="danger" size="sm" variant="outline" onClick={handleDeleteCase}>
+                <CButton
+                  color="danger"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDeleteCase}
+                  className="d-inline-flex align-items-center"
+                >
+                  <CIcon icon={cilTrash} className="me-1" />
                   Delete Case
                 </CButton>
               )}
@@ -673,8 +690,12 @@ const CaseDetails = () => {
                     <table className="table table-sm table-borderless">
                       <tbody>
                         <tr>
-                          <td className="text-muted w-25">Entity</td>
+                          <td className="text-muted w-25">Billing Entity</td>
                           <td>{caseData.billingEntity || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted">Employer</td>
+                          <td>{caseData.employer || '-'}</td>
                         </tr>
                         <tr>
                           <td className="text-muted">Origin</td>
