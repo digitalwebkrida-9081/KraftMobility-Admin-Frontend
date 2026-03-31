@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch } from 'react-redux'
 import {
   CButton,
   CCard,
@@ -37,6 +38,7 @@ const UserList = () => {
   const { getUsers, deleteUser, updateUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const dispatch = useDispatch()
   const queryParams = new URLSearchParams(location.search)
   const roleFilter = queryParams.get('role')
 
@@ -50,6 +52,7 @@ const UserList = () => {
 
   const fetchUsers = async (page = 1) => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const data = await getUsers(page, limit, roleFilter, 'approved')
       if (data.data) {
         setUsers(data.data)
@@ -66,6 +69,8 @@ const UserList = () => {
     } catch (error) {
       console.error('Failed to fetch users', error)
       toast.error('Failed to fetch users')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -92,12 +97,15 @@ const UserList = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
+          dispatch({ type: 'set_loading', loading: true })
           await deleteUser(id)
           toast.success('User deleted successfully')
           fetchUsers(currentPage) // Refresh list
         } catch (error) {
           console.error('Failed to delete user', error)
           toast.error('Failed to delete user')
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
         }
       }
     })
@@ -109,12 +117,15 @@ const UserList = () => {
 
   const handleApprove = async (id) => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       await updateUser(id, { status: 'approved' })
       toast.success('User approved successfully')
       fetchUsers(currentPage)
     } catch (error) {
       console.error('Failed to approve user', error)
       toast.error('Failed to approve user')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 

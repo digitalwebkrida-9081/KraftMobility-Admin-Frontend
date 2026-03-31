@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   CButton,
   CCard,
@@ -215,8 +216,10 @@ const COUNTRY_LIST = [
 
 const CreateCase = () => {
   const [formData, setFormData] = useState({
+    relocationId: '',
     assigneeName: '',
     billingEntity: '',
+    employer: '',
     gender: '',
     maritalStatus: '',
     movingWithFamily: '',
@@ -233,7 +236,7 @@ const CreateCase = () => {
     empNumber: '',
     spouseName: '',
     numberOfKids: '',
-    kids: [], // Array of kid objects { name: '', age: '', grade: '' }
+    kids: [],
     relocationType: '',
     servicesAuthorized: {
       homeSearch: false,
@@ -303,27 +306,68 @@ const CreateCase = () => {
     aadharCard_document: null,
   })
 
-  // For generic documents upload
-  const [generalDocuments, setGeneralDocuments] = useState([])
-  const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
+  const [currentStep, setCurrentStep] = useState(1)
+  const steps = ['Basics', 'Relocation', 'Family', 'Services', 'Tracking', 'Documents']
 
+  const [generalDocuments, setGeneralDocuments] = useState([])
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const loading = useSelector((state) => state.loading)
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
 
-  // Get current user role
   const userStr = localStorage.getItem('user')
   let userRole = ''
   if (userStr) {
     try {
       const parsedUser = JSON.parse(userStr)
-      const userObj = parsedUser?.user || parsedUser
-      userRole = userObj?.role || ''
+      userRole = (parsedUser?.user || parsedUser)?.role || ''
     } catch (e) {}
   }
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = e.target
+    if (type === 'checkbox' && name.startsWith('visa_')) {
+      const visaKey = name.split('_')[1]
+      setFormData((prev) => ({
+        ...prev,
+        visaDetails: { ...prev.visaDetails, [visaKey]: checked },
+      }))
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+    }
+  }
+
+  const handleServiceChange = (e) => {
+    const { name, checked } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      servicesAuthorized: { ...prev.servicesAuthorized, [name]: checked },
+    }))
+  }
+
+  const handleKidChange = (index, field, value) => {
+    const updatedKids = [...formData.kids]
+    updatedKids[index] = { ...updatedKids[index], [field]: value }
+    setFormData((prev) => ({ ...prev, kids: updatedKids }))
+  }
+
+  const handleNumberOfKidsChange = (e) => {
+    const num = parseInt(e.target.value, 10) || 0
+    let updatedKids = [...formData.kids]
+    if (num > updatedKids.length) {
+      for (let i = updatedKids.length; i < num; i++)
+        updatedKids.push({
+          name: '',
+          age: '',
+          grade: '',
+          schoolName: '',
+          schoolAddress: '',
+          typeOfSchool: '',
+        })
+    } else {
+      updatedKids = updatedKids.slice(0, num)
+    }
+    setFormData((prev) => ({ ...prev, numberOfKids: e.target.value, kids: updatedKids }))
   }
 
   const handleServiceTrackingChange = (service, field, value) => {
@@ -331,96 +375,43 @@ const CreateCase = () => {
       ...prev,
       serviceTracking: {
         ...prev.serviceTracking,
-        [service]: {
-          ...prev.serviceTracking[service],
-          [field]: value,
-        },
+        [service]: { ...prev.serviceTracking[service], [field]: value },
       },
-    }))
-  }
-
-  const handleCategorizedDocumentChange = (category, files) => {
-    setCategorizedDocuments((prev) => ({
-      ...prev,
-      [category]: files,
     }))
   }
 
   const handleGeneralDocumentChange = (index, field, value) => {
-    setGeneralDocuments((prev) => {
-      const newDocs = [...prev]
-      newDocs[index] = { ...newDocs[index], [field]: value }
-      return newDocs
-    })
+    const newDocs = [...generalDocuments]
+    newDocs[index] = { ...newDocs[index], [field]: value }
+    setGeneralDocuments(newDocs)
   }
 
-  const addGeneralDocument = () => {
-    setGeneralDocuments((prev) => [...prev, { type: '', file: null }])
-  }
+  const addGeneralDocument = () =>
+    setGeneralDocuments([...generalDocuments, { type: '', file: null }])
+  const removeGeneralDocument = (index) =>
+    setGeneralDocuments(generalDocuments.filter((_, i) => i !== index))
 
-  const removeGeneralDocument = (index) => {
-    setGeneralDocuments((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleNumberOfKidsChange = (e) => {
-    const { value } = e.target
-    // ensure value maps directly to text box but updates arrays safely
-    const num = parseInt(value, 10)
-    let updatedKids = [...formData.kids]
-
-    if (isNaN(num) || num < 0) {
-      updatedKids = []
-    } else {
-      if (num > updatedKids.length) {
-        const newKids = Array.from({ length: num - updatedKids.length }, () => ({
-          name: '',
-          age: '',
-          grade: '',
-        }))
-        updatedKids = [...updatedKids, ...newKids]
-      } else if (num < updatedKids.length) {
-        updatedKids = updatedKids.slice(0, num)
-      }
+  const nextStep = () => {
+    if (currentStep === 1 && !formData.assigneeName) {
+      toast.error('Please enter Assignee Name')
+      return
     }
-
-    setFormData((prev) => ({
-      ...prev,
-      numberOfKids: value,
-      kids: updatedKids,
-    }))
+    if (currentStep === 1 && !formData.relocationType) {
+      toast.error('Please select Relocation Type')
+      return
+    }
+    setCurrentStep((prev) => Math.min(prev + 1, steps.length))
+    window.scrollTo(0, 0)
   }
 
-  const handleServiceChange = (e) => {
-    const { name, checked } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      servicesAuthorized: {
-        ...prev.servicesAuthorized,
-        [name]: checked,
-      },
-    }))
-  }
-
-  const handleVisaDetailChange = (e) => {
-    const { name, checked } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      visaDetails: {
-        ...prev.visaDetails,
-        [name]: checked,
-      },
-    }))
-  }
-
-  const handleKidChange = (index, field, value) => {
-    const newKids = [...formData.kids]
-    newKids[index] = { ...newKids[index], [field]: value }
-    setFormData((prev) => ({ ...prev, kids: newKids }))
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1))
+    window.scrollTo(0, 0)
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+    if (e) e.preventDefault()
+    dispatch({ type: 'set_loading', loading: true })
 
     try {
       const token = localStorage.getItem('user')
@@ -428,176 +419,261 @@ const CreateCase = () => {
         : null
       const submitData = new FormData()
 
-      // Append standard fields
       Object.keys(formData).forEach((key) => {
-        if (
-          key === 'servicesAuthorized' ||
-          key === 'visaDetails' ||
-          key === 'kids' ||
-          key === 'serviceTracking'
-        ) {
+        if (['servicesAuthorized', 'serviceTracking', 'kids', 'visaDetails'].includes(key)) {
           submitData.append(key, JSON.stringify(formData[key]))
         } else {
-          submitData.append(key, formData[key])
+          submitData.append(key, formData[key] === null ? '' : formData[key])
         }
       })
 
-      // Helper to append a file with its specific documentType
       const appendDoc = (fileList, docType) => {
-        if (fileList) {
-          const filesArray = Array.from(fileList)
-          filesArray.forEach((file) => {
-            submitData.append('documents', file)
-            submitData.append('documentTypes', docType)
-          })
+        if (fileList && fileList.length > 0) {
+          submitData.append('documents', fileList[0])
+          submitData.append('documentTypes', docType)
         }
       }
 
-      // Append Categorized Documents based on selected services
       if (formData.servicesAuthorized.homeSearch) {
         appendDoc(categorizedDocuments.homeSearch_houseLease, 'House Lease')
         appendDoc(categorizedDocuments.homeSearch_propertyListing, 'Property Listing')
       }
-      if (formData.servicesAuthorized.orientationProgram) {
-        appendDoc(categorizedDocuments.orientation_itinerary, 'Itinerary')
-      }
-      if (formData.servicesAuthorized.schoolSearch) {
+      if (formData.servicesAuthorized.orientationProgram)
+        appendDoc(categorizedDocuments.orientation_itinerary, 'Orientation Itinerary')
+      if (formData.servicesAuthorized.schoolSearch)
         appendDoc(categorizedDocuments.schoolSearch_schoolListing, 'School Listing')
-      }
-      if (formData.servicesAuthorized.departure) {
-        appendDoc(categorizedDocuments.departure_propertyClosure, 'Property Closure Report')
-      }
+      if (formData.servicesAuthorized.departure)
+        appendDoc(categorizedDocuments.departure_propertyClosure, 'Property Closure Doc')
       if (formData.servicesAuthorized.visaApplication) {
         appendDoc(categorizedDocuments.visa_visaCopy, 'Visa Copy')
         appendDoc(categorizedDocuments.visa_passportCopy, 'Passport Copy')
         appendDoc(categorizedDocuments.visa_frroDocument, 'FRRO Document')
         appendDoc(categorizedDocuments.visa_extensionDocument, 'Visa Extension Document')
       }
-      if (formData.servicesAuthorized.aadharCard) {
+      if (formData.servicesAuthorized.aadharCard)
         appendDoc(categorizedDocuments.aadharCard_document, 'Aadhar Card Document')
-      }
-      // Append Generic/Initial Documents
+
       generalDocuments.forEach((doc) => {
         if (doc.type && doc.file && doc.file.length > 0) {
-          appendDoc(doc.file, doc.type)
+          submitData.append('documents', doc.file[0])
+          submitData.append('documentTypes', doc.type)
         }
       })
 
-      const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
-      const response = await axios.post(`${BASE_API_URL}/cases`, submitData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      await axios.post(`${BASE_API_URL}/cases`, submitData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       })
 
       toast.success('Case Initiated successfully!')
       navigate('/cases')
     } catch (error) {
-      console.error('Error initiating case:', error)
+      console.error(error)
       toast.error(error.response?.data?.message || 'Failed to initiate case.')
     } finally {
-      setLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
+  }
+
+  const StatusStepper = ({ currentStep }) => {
+    const currentIndex = currentStep - 1
+    return (
+      <div className="mb-5 mt-2 px-2">
+        <div className="d-flex justify-content-between position-relative">
+          <div
+            className="position-absolute w-100"
+            style={{ height: '2px', backgroundColor: '#e0e0e0', top: '18px', zIndex: 0 }}
+          ></div>
+          <div
+            className="position-absolute"
+            style={{
+              height: '2px',
+              backgroundColor: '#0d6efd',
+              top: '18px',
+              width: `${(currentIndex / (steps.length - 1)) * 100}%`,
+              zIndex: 1,
+              transition: 'width 0.5s ease',
+            }}
+          ></div>
+          {steps.map((step, index) => {
+            const isActive = index <= currentIndex
+            const isCurrent = index === currentIndex
+            return (
+              <div
+                key={step}
+                className="d-flex flex-column align-items-center position-relative"
+                style={{ zIndex: 2, width: '60px' }}
+              >
+                <div
+                  className={`rounded-circle d-flex align-items-center justify-content-center border-2 transition-all ${isActive ? 'bg-primary border-primary text-white' : 'bg-white border-light text-muted'}`}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    boxShadow: isCurrent ? '0 0 0 4px rgba(13, 110, 253, 0.15)' : 'none',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {index < currentIndex ? '✓' : index + 1}
+                </div>
+                <div
+                  className={`mt-2 small fw-bold text-center ${isActive ? 'text-primary' : 'text-muted'}`}
+                  style={{ fontSize: '12px', textTransform: 'uppercase' }}
+                >
+                  {step}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   return (
     <CRow>
       <CCol xs={12}>
-        <CCard className="mb-4">
-          <CCardHeader>
-            <strong>Initiate New Case</strong>
+        <CCard className="mb-4 shadow-sm border-0 rounded-3 overflow-hidden">
+          <CCardHeader className="bg-white py-3 border-bottom shadow-sm">
+            <strong className="fs-5 text-dark">Case Initiation Workflow</strong>
           </CCardHeader>
-          <CCardBody>
-            <CForm onSubmit={handleSubmit}>
-              <h5 className="mb-3 border-bottom pb-2">Relocation Type</h5>
-              <CRow className="mb-4">
-                <CCol md={6}>
-                  <CFormCheck
-                    type="radio"
-                    name="relocationType"
-                    id="relocationDomestic"
-                    label="Domestic Relocation"
-                    value="Domestic"
-                    checked={formData.relocationType === 'Domestic'}
-                    onChange={handleInputChange}
-                  />
-                </CCol>
-                <CCol md={6}>
-                  <CFormCheck
-                    type="radio"
-                    name="relocationType"
-                    id="relocationInternational"
-                    label="International Relocation"
-                    value="International"
-                    checked={formData.relocationType === 'International'}
-                    onChange={handleInputChange}
-                  />
-                </CCol>
-              </CRow>
-
-              {formData.relocationType && (
-                <>
-                  <h5 className="mb-3 border-bottom pb-2">Assignee Information</h5>
-                  <CRow className="mb-3">
+          <CCardBody className="p-4">
+            <StatusStepper currentStep={currentStep} />
+            <CForm onSubmit={(e) => e.preventDefault()}>
+              {currentStep === 1 && (
+                <div className="fade-in">
+                  <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
+                    Step 1: Assignee & Company Basics
+                  </h6>
+                  <CRow className="mb-4">
                     <CCol md={6}>
-                      <CFormLabel>Assignee Name *</CFormLabel>
-                      <CFormInput
-                        required
-                        name="assigneeName"
-                        value={formData.assigneeName}
-                        onChange={handleInputChange}
-                      />
-                    </CCol>
-                    <CCol md={6}>
-                      <CFormLabel>Employee Number</CFormLabel>
-                      <CFormInput
-                        name="empNumber"
-                        value={formData.empNumber}
-                        onChange={handleInputChange}
-                      />
+                      <CFormLabel className="fw-bold">Relocation Category *</CFormLabel>
+                      <div className="d-flex gap-3">
+                        <div
+                          className={`p-3 border rounded-3 flex-fill text-center ${formData.relocationType === 'Domestic' ? 'border-primary bg-light' : ''}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() =>
+                            handleInputChange({
+                              target: { name: 'relocationType', value: 'Domestic' },
+                            })
+                          }
+                        >
+                          <CFormCheck
+                            type="radio"
+                            label={<span className="fw-bold">Domestic</span>}
+                            checked={formData.relocationType === 'Domestic'}
+                            onChange={() => {}}
+                          />
+                        </div>
+                        <div
+                          className={`p-3 border rounded-3 flex-fill text-center ${formData.relocationType === 'International' ? 'border-primary bg-light' : ''}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() =>
+                            handleInputChange({
+                              target: { name: 'relocationType', value: 'International' },
+                            })
+                          }
+                        >
+                          <CFormCheck
+                            type="radio"
+                            label={<span className="fw-bold">International</span>}
+                            checked={formData.relocationType === 'International'}
+                            onChange={() => {}}
+                          />
+                        </div>
+                      </div>
                     </CCol>
                   </CRow>
+                  {formData.relocationType && (
+                    <div className="fade-in">
+                      <CRow className="mb-3">
+                        <CCol md={8}>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Assignee Full Name *
+                          </CFormLabel>
+                          <CFormInput
+                            required
+                            name="assigneeName"
+                            value={formData.assigneeName}
+                            onChange={handleInputChange}
+                            placeholder="Name as per passport/ID"
+                          />
+                        </CCol>
+                        <CCol md={4}>
+                          <CFormLabel className="small fw-bold text-muted">Employee #</CFormLabel>
+                          <CFormInput
+                            name="empNumber"
+                            value={formData.empNumber}
+                            onChange={handleInputChange}
+                            placeholder="ID Number"
+                          />
+                        </CCol>
+                      </CRow>
+                      <CRow className="mb-3">
+                        <CCol md={6}>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Billing Entity (Client Company)
+                          </CFormLabel>
+                          <CFormInput
+                            name="billingEntity"
+                            value={formData.billingEntity}
+                            onChange={handleInputChange}
+                          />
+                        </CCol>
+                        <CCol md={6}>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Employer Organization
+                          </CFormLabel>
+                          <CFormInput
+                            name="employer"
+                            value={formData.employer}
+                            onChange={handleInputChange}
+                          />
+                        </CCol>
+                      </CRow>
+                      <CRow className="mb-3">
+                        <CCol md={4}>
+                          <CFormLabel className="small fw-bold text-muted">Gender</CFormLabel>
+                          <CFormSelect
+                            name="gender"
+                            value={formData.gender}
+                            onChange={handleInputChange}
+                          >
+                            <option value="">Select...</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={4}>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Marital Status
+                          </CFormLabel>
+                          <CFormSelect
+                            name="maritalStatus"
+                            value={formData.maritalStatus}
+                            onChange={handleInputChange}
+                          >
+                            <option value="">Select...</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Other">Other</option>
+                          </CFormSelect>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )}
+                </div>
+              )}
 
+              {currentStep === 2 && (
+                <div className="fade-in">
+                  <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
+                    Step 2: Relocation Route & Contact
+                  </h6>
                   <CRow className="mb-3">
                     <CCol md={4}>
-                      <CFormLabel>Billing Entity</CFormLabel>
-                      <CFormInput
-                        name="billingEntity"
-                        value={formData.billingEntity}
-                        onChange={handleInputChange}
-                      />
-                    </CCol>
-                    <CCol md={4}>
-                      <CFormLabel>Gender</CFormLabel>
-                      <CFormSelect
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </CFormSelect>
-                    </CCol>
-                    <CCol md={4}>
-                      <CFormLabel>Marital Status</CFormLabel>
-                      <CFormSelect
-                        name="maritalStatus"
-                        value={formData.maritalStatus}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select...</option>
-                        <option value="Single">Single</option>
-                        <option value="Married">Married</option>
-                      </CFormSelect>
-                    </CCol>
-                  </CRow>
-
-                  <CRow className="mb-3">
-                    <CCol md={4}>
-                      <CFormLabel>Moving With Family</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">
+                        Family Relocating?
+                      </CFormLabel>
                       <CFormSelect
                         name="movingWithFamily"
                         value={formData.movingWithFamily}
@@ -611,31 +687,35 @@ const CreateCase = () => {
                     {formData.relocationType === 'International' && (
                       <>
                         <CCol md={4}>
-                          <CFormLabel>Moving From (Country)</CFormLabel>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Origin Country
+                          </CFormLabel>
                           <CFormSelect
                             name="movingFromCountry"
                             value={formData.movingFromCountry}
                             onChange={handleInputChange}
                           >
                             <option value="">Select...</option>
-                            {COUNTRY_LIST.map((country) => (
-                              <option key={country} value={country}>
-                                {country}
+                            {COUNTRY_LIST.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
                               </option>
                             ))}
                           </CFormSelect>
                         </CCol>
                         <CCol md={4}>
-                          <CFormLabel>Moving To (Country)</CFormLabel>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Destination Country
+                          </CFormLabel>
                           <CFormSelect
                             name="movingToCountry"
                             value={formData.movingToCountry}
                             onChange={handleInputChange}
                           >
                             <option value="">Select...</option>
-                            {COUNTRY_LIST.map((country) => (
-                              <option key={country} value={country}>
-                                {country}
+                            {COUNTRY_LIST.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
                               </option>
                             ))}
                           </CFormSelect>
@@ -643,10 +723,9 @@ const CreateCase = () => {
                       </>
                     )}
                   </CRow>
-
                   <CRow className="mb-3">
                     <CCol md={6}>
-                      <CFormLabel>Moving From (City)</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">Source City</CFormLabel>
                       <CFormInput
                         name="movingFromCity"
                         value={formData.movingFromCity}
@@ -654,14 +733,15 @@ const CreateCase = () => {
                       />
                     </CCol>
                     <CCol md={6}>
-                      <CFormLabel>Moving To (City)</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">Target City</CFormLabel>
                       <CFormInput name="city" value={formData.city} onChange={handleInputChange} />
                     </CCol>
                   </CRow>
-
                   <CRow className="mb-3">
                     <CCol md={6}>
-                      <CFormLabel>Official Email Address</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">
+                        Primary Work Email
+                      </CFormLabel>
                       <CFormInput
                         type="email"
                         name="officialEmailAddress"
@@ -669,11 +749,10 @@ const CreateCase = () => {
                         onChange={handleInputChange}
                       />
                     </CCol>
-                  </CRow>
-
-                  <CRow className="mb-3">
                     <CCol md={6}>
-                      <CFormLabel>Personal Email Address</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">
+                        Secondary/Personal Email
+                      </CFormLabel>
                       <CFormInput
                         type="email"
                         name="personalEmailAddress"
@@ -681,19 +760,10 @@ const CreateCase = () => {
                         onChange={handleInputChange}
                       />
                     </CCol>
-                    <CCol md={6}>
-                      <CFormLabel>Current Home Telephone Number</CFormLabel>
-                      <CFormInput
-                        name="currentHomeTelephoneNumber"
-                        value={formData.currentHomeTelephoneNumber}
-                        onChange={handleInputChange}
-                      />
-                    </CCol>
                   </CRow>
-
-                  <CRow className="mb-4">
+                  <CRow className="mb-3">
                     <CCol md={4}>
-                      <CFormLabel>Mobile Number</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">Mobile Number</CFormLabel>
                       <CFormInput
                         name="mobileNumber"
                         value={formData.mobileNumber}
@@ -701,32 +771,49 @@ const CreateCase = () => {
                       />
                     </CCol>
                     <CCol md={4}>
-                      <CFormLabel>Host Phone Number</CFormLabel>
+                      <CFormLabel className="small fw-bold text-muted">Home Phone</CFormLabel>
+                      <CFormInput
+                        name="currentHomeTelephoneNumber"
+                        value={formData.currentHomeTelephoneNumber}
+                        onChange={handleInputChange}
+                      />
+                    </CCol>
+                    <CCol md={4}>
+                      <CFormLabel className="small fw-bold text-muted">Local Host Phone</CFormLabel>
                       <CFormInput
                         name="hostPhoneNumber"
                         value={formData.hostPhoneNumber}
                         onChange={handleInputChange}
                       />
                     </CCol>
-                    <CCol md={4}>
-                      <CFormLabel>Current Home Address</CFormLabel>
-                      <CFormInput
+                  </CRow>
+                  <CRow className="mb-3">
+                    <CCol md={12}>
+                      <CFormLabel className="small fw-bold text-muted">
+                        Current Residence Address
+                      </CFormLabel>
+                      <CFormTextarea
+                        rows={2}
                         name="currentHomeAddress"
                         value={formData.currentHomeAddress}
                         onChange={handleInputChange}
                       />
                     </CCol>
                   </CRow>
+                </div>
+              )}
 
-                  {/* Kids Section */}
-                  {(formData.movingWithFamily === 'Yes' ||
-                    formData.maritalStatus === 'Married') && (
-                    <div className="mb-4 p-3 border rounded bg-light">
-                      <h6 className="mb-3">Family Information</h6>
+              {currentStep === 3 && (
+                <div className="fade-in">
+                  <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
+                    Step 3: Spouse & Kids Detail
+                  </h6>
+                  {formData.movingWithFamily === 'Yes' || formData.maritalStatus === 'Married' ? (
+                    <div className="bg-light p-4 rounded-3 border">
                       {formData.maritalStatus === 'Married' && (
-                        <CRow className="mb-3">
+                        <CRow className="mb-4">
                           <CCol md={6}>
-                            <CFormLabel>Spouse Name</CFormLabel>
+                            <CFormLabel className="fw-bold">Spouse Name</CFormLabel>
                             <CFormInput
                               name="spouseName"
                               value={formData.spouseName}
@@ -737,911 +824,535 @@ const CreateCase = () => {
                       )}
                       {formData.movingWithFamily === 'Yes' && (
                         <>
-                          <CRow className="mb-3">
-                            <CCol md={6}>
-                              <CFormLabel>Number of Kids</CFormLabel>
+                          <CRow className="mb-4">
+                            <CCol md={3}>
+                              <CFormLabel className="fw-bold">Number of Children</CFormLabel>
                               <CFormInput
                                 type="number"
                                 min="0"
-                                name="numberOfKids"
                                 value={formData.numberOfKids}
                                 onChange={handleNumberOfKidsChange}
                               />
                             </CCol>
                           </CRow>
-                          <CRow>
+                          <div style={{ maxHeight: '400px', overflowY: 'auto' }} className="pe-2">
                             {formData.kids.map((kid, idx) => (
-                              <React.Fragment key={idx}>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Kid {idx + 1} Name</CFormLabel>
-                                  <CFormInput
-                                    value={kid.name || ''}
-                                    onChange={(e) => handleKidChange(idx, 'name', e.target.value)}
-                                  />
-                                </CCol>
-                                <CCol md={2} className="mb-3">
-                                  <CFormLabel>Kid {idx + 1} Age</CFormLabel>
-                                  <CFormInput
-                                    type="number"
-                                    value={kid.age || ''}
-                                    onChange={(e) => handleKidChange(idx, 'age', e.target.value)}
-                                  />
-                                </CCol>
-                              </React.Fragment>
+                              <div key={idx} className="mb-4 p-3 bg-white border rounded shadow-sm">
+                                <p className="fw-bold text-primary small border-bottom mb-3 pb-1">
+                                  CHILD #{idx + 1} PROFILE
+                                </p>
+                                <CRow className="g-3">
+                                  <CCol md={6}>
+                                    <CFormLabel className="small fw-bold">Name</CFormLabel>
+                                    <CFormInput
+                                      size="sm"
+                                      value={kid.name}
+                                      onChange={(e) => handleKidChange(idx, 'name', e.target.value)}
+                                    />
+                                  </CCol>
+                                  <CCol md={3}>
+                                    <CFormLabel className="small fw-bold">Age</CFormLabel>
+                                    <CFormInput
+                                      size="sm"
+                                      type="number"
+                                      value={kid.age}
+                                      onChange={(e) => handleKidChange(idx, 'age', e.target.value)}
+                                    />
+                                  </CCol>
+                                  <CCol md={3}>
+                                    <CFormLabel className="small fw-bold">Grade</CFormLabel>
+                                    <CFormInput
+                                      size="sm"
+                                      value={kid.grade}
+                                      onChange={(e) =>
+                                        handleKidChange(idx, 'grade', e.target.value)
+                                      }
+                                    />
+                                  </CCol>
+                                  <CCol md={6}>
+                                    <CFormLabel className="small fw-bold">
+                                      Current School
+                                    </CFormLabel>
+                                    <CFormInput
+                                      size="sm"
+                                      value={kid.schoolName}
+                                      onChange={(e) =>
+                                        handleKidChange(idx, 'schoolName', e.target.value)
+                                      }
+                                    />
+                                  </CCol>
+                                  <CCol md={6}>
+                                    <CFormLabel className="small fw-bold">
+                                      Board Preferance
+                                    </CFormLabel>
+                                    <CFormSelect
+                                      size="sm"
+                                      value={kid.typeOfSchool}
+                                      onChange={(e) =>
+                                        handleKidChange(idx, 'typeOfSchool', e.target.value)
+                                      }
+                                    >
+                                      <option value="">Select...</option>
+                                      <option value="CBSE">CBSE</option>
+                                      <option value="ICSE">ICSE</option>
+                                      <option value="International Board">
+                                        International Board
+                                      </option>
+                                      <option value="Other">Other</option>
+                                    </CFormSelect>
+                                  </CCol>
+                                </CRow>
+                              </div>
                             ))}
-                          </CRow>
+                          </div>
                         </>
                       )}
                     </div>
+                  ) : (
+                    <div className="text-center py-5 bg-light rounded">
+                      <p className="mb-0 text-muted">
+                        No family members identified for this relocation.
+                      </p>
+                    </div>
                   )}
+                </div>
+              )}
 
-                  {(formData.relocationType === 'International' ||
-                    formData.relocationType === 'Domestic') && (
-                    <>
-                      <h5 className="mt-4 mb-3 border-bottom pb-2">Services Authorized</h5>
-                      <CRow className="mb-3">
-                        {Object.keys(formData.servicesAuthorized)
-                          .filter((key) => !['personalLease', 'corporateLease'].includes(key))
-                          .filter(
-                            (key) =>
-                              formData.relocationType === 'International' ||
-                              ['homeSearch', 'schoolSearch', 'householdGoodsMovement'].includes(
-                                key,
-                              ),
-                          )
-                          .map((serviceKey) => (
-                            <CCol md={4} key={serviceKey} className="mb-3">
-                              <CFormCheck
-                                id={serviceKey}
-                                name={serviceKey}
-                                label={serviceKey
-                                  .replace(/([A-Z])/g, ' $1')
-                                  .replace(/^./, (str) => str.toUpperCase())}
-                                checked={formData.servicesAuthorized[serviceKey]}
-                                onChange={handleServiceChange}
-                              />
-                              {serviceKey === 'homeSearch' && formData.servicesAuthorized.homeSearch && (
-                                <div className="ms-3 mt-2 border-start ps-2">
-                                  <CFormCheck
-                                    name="personalLease"
-                                    id="personalLease"
-                                    label="Personal Lease"
-                                    checked={formData.servicesAuthorized.personalLease}
-                                    onChange={handleServiceChange}
-                                  />
-                                  <CFormCheck
-                                    name="corporateLease"
-                                    id="corporateLease"
-                                    label="Corporate Lease"
-                                    checked={formData.servicesAuthorized.corporateLease}
-                                    onChange={handleServiceChange}
-                                  />
-                                  <div className="mt-2" style={{ maxWidth: '200px' }}>
-                                    <CFormLabel className="small mb-1">Budget (Rupees)</CFormLabel>
-                                    <CInputGroup size="sm">
-                                      <CInputGroupText>₹</CInputGroupText>
-                                      <CFormInput
-                                        type="number"
-                                        name="homeSearchBudget"
-                                        value={formData.homeSearchBudget}
-                                        onChange={handleInputChange}
-                                        placeholder="Enter amount"
-                                      />
-                                    </CInputGroup>
-                                  </div>
-                                </div>
-                              )}
-                            </CCol>
-                          ))}
-                      </CRow>
-
-                      {/* Conditional Service Metadata */}
-                      {userRole !== 'HR' &&
-                        (formData.servicesAuthorized.homeSearch ||
-                          formData.servicesAuthorized.householdGoodsMovement ||
-                          formData.servicesAuthorized.orientationProgram ||
-                          formData.servicesAuthorized.schoolSearch ||
-                          formData.servicesAuthorized.departure ||
-                          formData.servicesAuthorized.tenancyManagement ||
-                          formData.servicesAuthorized.aadharCard ||
-                          formData.servicesAuthorized.other ||
-                          formData.servicesAuthorized.visaApplication) && (
-                          <div className="mb-4 p-3 border rounded bg-light">
-                            <h6 className="mb-3">Service Specific Details</h6>
-
-                          {/* Home Search Fields */}
-                          {formData.servicesAuthorized.homeSearch && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Home Search Requirements
-                              </strong>
-
-                              <CRow>
-                                <CCol md={3} className="mb-3">
-                                  <CFormLabel>Start Date</CFormLabel>
+              {currentStep === 4 && (
+                <div className="fade-in">
+                  <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
+                    Step 4: Scope of Authorized Services
+                  </h6>
+                  <CRow>
+                    {Object.keys(formData.servicesAuthorized)
+                      .filter((k) => !['personalLease', 'corporateLease'].includes(k))
+                      .filter(
+                        (k) =>
+                          formData.relocationType === 'International' ||
+                          ['homeSearch', 'schoolSearch', 'householdGoodsMovement'].includes(k),
+                      )
+                      .map((sk) => (
+                        <CCol md={6} xl={4} key={sk} className="mb-3">
+                          <div
+                            className={`p-3 border rounded-3 h-100 ${formData.servicesAuthorized[sk] ? 'bg-light border-primary shadow-sm' : ''}`}
+                          >
+                            <CFormCheck
+                              label={
+                                <span className="fw-bold">
+                                  {sk.replace(/([A-Z])/g, ' $1').toUpperCase()}
+                                </span>
+                              }
+                              name={sk}
+                              checked={formData.servicesAuthorized[sk]}
+                              onChange={handleServiceChange}
+                            />
+                            {sk === 'homeSearch' && formData.servicesAuthorized.homeSearch && (
+                              <div className="mt-3 ms-4 border-start ps-3 py-2 bg-white rounded border">
+                                <CFormLabel className="small fw-bold text-primary mb-2">
+                                  Lease Structure
+                                </CFormLabel>
+                                <CFormCheck
+                                  label="Personal Lease"
+                                  className="small"
+                                  name="personalLease"
+                                  checked={formData.servicesAuthorized.personalLease}
+                                  onChange={handleServiceChange}
+                                />
+                                <CFormCheck
+                                  label="Corporate Lease"
+                                  className="small mb-3"
+                                  name="corporateLease"
+                                  checked={formData.servicesAuthorized.corporateLease}
+                                  onChange={handleServiceChange}
+                                />
+                                <CFormLabel className="small fw-bold">
+                                  Max Monthly Budget
+                                </CFormLabel>
+                                <CInputGroup size="sm">
+                                  <CInputGroupText>₹</CInputGroupText>
                                   <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.homeSearch.startDate}
+                                    placeholder="Amount"
+                                    value={formData.homeSearchBudget}
                                     onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'homeSearch',
-                                        'startDate',
-                                        e.target.value,
-                                      )
+                                      setFormData({ ...formData, homeSearchBudget: e.target.value })
                                     }
                                   />
-                                </CCol>
-                                <CCol md={3} className="mb-3">
-                                  <CFormLabel>End Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.homeSearch.endDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'homeSearch',
-                                        'endDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Property Address</CFormLabel>
-                                  <CFormInput
-                                    value={formData.serviceTracking.homeSearch.propertyAddress}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'homeSearch',
-                                        'propertyAddress',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={3} className="mb-3">
-                                  <CFormLabel>Monthly Rent</CFormLabel>
-                                  <CInputGroup>
-                                    <CInputGroupText>₹</CInputGroupText>
-                                    <CFormInput
-                                      type="number"
-                                      value={formData.serviceTracking.homeSearch.monthlyRent}
-                                      onChange={(e) =>
-                                        handleServiceTrackingChange(
-                                          'homeSearch',
-                                          'monthlyRent',
-                                          e.target.value,
-                                        )
-                                      }
-                                    />
-                                  </CInputGroup>
-                                </CCol>
-                                <CCol md={3} className="mb-3">
-                                  <CFormLabel>Deposit</CFormLabel>
-                                  <CInputGroup>
-                                    <CInputGroupText>₹</CInputGroupText>
-                                    <CFormInput
-                                      type="number"
-                                      value={formData.serviceTracking.homeSearch.deposit}
-                                      onChange={(e) =>
-                                        handleServiceTrackingChange(
-                                          'homeSearch',
-                                          'deposit',
-                                          e.target.value,
-                                        )
-                                      }
-                                    />
-                                  </CInputGroup>
-                                </CCol>
-                                <CCol md={3} className="mb-3">
-                                  <CFormLabel>Lease Start Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.homeSearch.leaseStartDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'homeSearch',
-                                        'leaseStartDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={3} className="mb-3">
-                                  <CFormLabel>Lease End Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.homeSearch.leaseEndDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'homeSearch',
-                                        'leaseEndDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Budget</CFormLabel>
-                                  <CInputGroup>
-                                    <CInputGroupText>₹</CInputGroupText>
-                                    <CFormInput
-                                      type="number"
-                                      name="homeSearchBudget"
-                                      value={formData.homeSearchBudget}
+                                </CInputGroup>
+                              </div>
+                            )}
+                            {sk === 'visaApplication' &&
+                              formData.servicesAuthorized.visaApplication && (
+                                <div className="mt-3 ms-4 border-start ps-3 py-2 bg-white rounded border">
+                                  <CFormLabel className="small fw-bold text-info mb-2">
+                                    Immigration Scope
+                                  </CFormLabel>
+                                  {Object.keys(formData.visaDetails).map((vk) => (
+                                    <CFormCheck
+                                      key={vk}
+                                      label={vk
+                                        .replace(/([A-Z])/g, ' $1')
+                                        .replace(/^./, (s) => s.toUpperCase())}
+                                      name={`visa_${vk}`}
+                                      checked={formData.visaDetails[vk]}
                                       onChange={handleInputChange}
+                                      size="sm"
                                     />
-                                  </CInputGroup>
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>House Lease Document</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'homeSearch_houseLease',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Property Listing Document</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'homeSearch_propertyListing',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* Orientation Program Fields */}
-                          {formData.servicesAuthorized.orientationProgram && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Orientation Program Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Start Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.orientation.startDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'orientation',
-                                        'startDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>End Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.orientation.endDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'orientation',
-                                        'endDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Itinerary Upload</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'orientation_itinerary',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* School Search Fields */}
-                          {formData.servicesAuthorized.schoolSearch && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                School Search Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Start Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.schoolSearch.startDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'schoolSearch',
-                                        'startDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>End Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.schoolSearch.endDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'schoolSearch',
-                                        'endDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Number of Kids</CFormLabel>
-                                  <CFormInput
-                                    type="number"
-                                    min="0"
-                                    name="numberOfKids"
-                                    value={formData.numberOfKids}
-                                    onChange={handleNumberOfKidsChange}
-                                  />
-                                </CCol>
-                              </CRow>
-
-                              {formData.kids.length > 0 && (
-                                <div className="mt-3 p-3 border rounded bg-white">
-                                  <h6 className="mb-3">Children Details for Schooling</h6>
-                                  {formData.kids.map((kid, index) => (
-                                    <div key={index} className="mb-4 pb-3 border-bottom">
-                                      <strong className="d-block mb-3 text-secondary">Kid {index + 1} Profile</strong>
-                                      <CRow className="mb-3 align-items-end">
-                                        <CCol md={4}>
-                                          <CFormLabel className="small">Name</CFormLabel>
-                                          <CFormInput
-                                            size="sm"
-                                            value={kid.name || ''}
-                                            onChange={(e) => {
-                                              const newKids = [...formData.kids]
-                                              newKids[index].name = e.target.value
-                                              setFormData((prev) => ({ ...prev, kids: newKids }))
-                                            }}
-                                          />
-                                        </CCol>
-                                        <CCol md={2}>
-                                          <CFormLabel className="small">Age</CFormLabel>
-                                          <CFormInput
-                                            size="sm"
-                                            type="number"
-                                            value={kid.age || ''}
-                                            onChange={(e) => {
-                                              const newKids = [...formData.kids]
-                                              newKids[index].age = e.target.value
-                                              setFormData((prev) => ({ ...prev, kids: newKids }))
-                                            }}
-                                          />
-                                        </CCol>
-                                        <CCol md={3}>
-                                          <CFormLabel className="small">Admitting Grade</CFormLabel>
-                                          <CFormInput
-                                            size="sm"
-                                            value={kid.grade || ''}
-                                            onChange={(e) => {
-                                              const newKids = [...formData.kids]
-                                              newKids[index].grade = e.target.value
-                                              setFormData((prev) => ({ ...prev, kids: newKids }))
-                                            }}
-                                            placeholder="e.g. 5th Grade"
-                                          />
-                                        </CCol>
-                                        <CCol md={3}>
-                                          <CFormLabel className="small">Type of School</CFormLabel>
-                                          <CFormSelect
-                                            size="sm"
-                                            value={kid.typeOfSchool || ''}
-                                            onChange={(e) => {
-                                              const newKids = [...formData.kids]
-                                              newKids[index].typeOfSchool = e.target.value
-                                              setFormData((prev) => ({ ...prev, kids: newKids }))
-                                            }}
-                                          >
-                                            <option value="">Select...</option>
-                                            <option value="CBSE">CBSE</option>
-                                            <option value="ICSE">ICSE</option>
-                                            <option value="International Board">Intl Board</option>
-                                            <option value="Other">Other</option>
-                                          </CFormSelect>
-                                        </CCol>
-                                      </CRow>
-                                      <CRow>
-                                        <CCol md={4}>
-                                          <CFormLabel className="small">School Name</CFormLabel>
-                                          <CFormInput
-                                            size="sm"
-                                            value={kid.schoolName || ''}
-                                            onChange={(e) => {
-                                              const newKids = [...formData.kids]
-                                              newKids[index].schoolName = e.target.value
-                                              setFormData((prev) => ({ ...prev, kids: newKids }))
-                                            }}
-                                            placeholder="Enter school name"
-                                          />
-                                        </CCol>
-                                        <CCol md={8}>
-                                          <CFormLabel className="small">School Address</CFormLabel>
-                                          <CFormInput
-                                            size="sm"
-                                            value={kid.schoolAddress || ''}
-                                            onChange={(e) => {
-                                              const newKids = [...formData.kids]
-                                              newKids[index].schoolAddress = e.target.value
-                                              setFormData((prev) => ({ ...prev, kids: newKids }))
-                                            }}
-                                            placeholder="Enter school address"
-                                          />
-                                        </CCol>
-                                      </CRow>
-                                    </div>
                                   ))}
                                 </div>
                               )}
-
-                              <CRow className="mt-3">
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>School Listing Upload</CFormLabel>
+                            {sk === 'householdGoodsMovement' &&
+                              formData.servicesAuthorized.householdGoodsMovement && (
+                                <div className="mt-3 ms-4 border-start ps-3 py-2 bg-white rounded border">
+                                  <CFormLabel className="small fw-bold mb-2">
+                                    HHG Entitlement
+                                  </CFormLabel>
                                   <CFormInput
-                                    type="file"
+                                    size="sm"
+                                    placeholder="e.g. 1 Full 20ft Container"
+                                    value={formData.householdGoodsLimit}
                                     onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'schoolSearch_schoolListing',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* Departure Fields */}
-                          {formData.servicesAuthorized.departure && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Departure Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Property Closure Report Upload</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'departure_propertyClosure',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* Tenancy Management Fields */}
-                          {formData.servicesAuthorized.tenancyManagement && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Tenancy Management Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Start Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.tenancyManagement.startDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'tenancyManagement',
-                                        'startDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>End Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.tenancyManagement.endDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'tenancyManagement',
-                                        'endDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* Visa Fields */}
-                          {formData.servicesAuthorized.visaApplication && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Visa Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Visa Start Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.visa.startDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'visa',
-                                        'startDate',
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Visa End Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.visa.endDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange('visa', 'endDate', e.target.value)
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Visa Type</CFormLabel>
-                                  <CFormInput
-                                    value={formData.serviceTracking.visa.type}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange('visa', 'type', e.target.value)
-                                    }
-                                  />
-                                </CCol>
-                                <CCol xs={12} className="mt-2 mb-3">
-                                  <strong className="d-block mb-2">Internal Visa Flags:</strong>
-                                  <CRow>
-                                    <CCol md={2}>
-                                      <CFormCheck
-                                        name="businessVisa"
-                                        label="Business Visa"
-                                        checked={formData.visaDetails.businessVisa}
-                                        onChange={handleVisaDetailChange}
-                                      />
-                                    </CCol>
-                                    <CCol md={3}>
-                                      <CFormCheck
-                                        name="employmentVisa"
-                                        label="Employment Visa"
-                                        checked={formData.visaDetails.employmentVisa}
-                                        onChange={handleVisaDetailChange}
-                                      />
-                                    </CCol>
-                                    <CCol md={2}>
-                                      <CFormCheck
-                                        name="touristVisa"
-                                        label="Tourist Visa"
-                                        checked={formData.visaDetails.touristVisa}
-                                        onChange={handleVisaDetailChange}
-                                      />
-                                    </CCol>
-                                    <CCol md={2}>
-                                      <CFormCheck
-                                        name="frro"
-                                        label="FRRO"
-                                        checked={formData.visaDetails.frro}
-                                        onChange={handleVisaDetailChange}
-                                      />
-                                    </CCol>
-                                    <CCol md={3}>
-                                      <CFormCheck
-                                        name="visaExtension"
-                                        label="Visa Extension"
-                                        checked={formData.visaDetails.visaExtension}
-                                        onChange={handleVisaDetailChange}
-                                      />
-                                    </CCol>
-                                  </CRow>
-                                </CCol>
-                                {formData.visaDetails.frro && (
-                                  <>
-                                    <CCol md={4} className="mb-3">
-                                      <CFormLabel>FRRO Start Date</CFormLabel>
-                                      <CFormInput
-                                        type="date"
-                                        value={formData.serviceTracking.visa.frroStartDate}
-                                        onChange={(e) =>
-                                          handleServiceTrackingChange(
-                                            'visa',
-                                            'frroStartDate',
-                                            e.target.value,
-                                          )
-                                        }
-                                      />
-                                    </CCol>
-                                    <CCol md={4} className="mb-3">
-                                      <CFormLabel>FRRO End Date</CFormLabel>
-                                      <CFormInput
-                                        type="date"
-                                        value={formData.serviceTracking.visa.frroEndDate}
-                                        onChange={(e) =>
-                                          handleServiceTrackingChange(
-                                            'visa',
-                                            'frroEndDate',
-                                            e.target.value,
-                                          )
-                                        }
-                                      />
-                                    </CCol>
-                                  </>
-                                )}
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Visa Copy</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'visa_visaCopy',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Passport Copy</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'visa_passportCopy',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>FRRO Document</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'visa_frroDocument',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Visa Extension Document</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'visa_extensionDocument',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* Other standard checks like limits that don't fit exactly above */}
-                          {formData.servicesAuthorized.householdGoodsMovement && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Household Goods Movement Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={4} className="mb-3">
-                                  <CFormLabel>Household Goods Limit</CFormLabel>
-                                  <CFormSelect
-                                    name="householdGoodsContainerSize"
-                                    value={formData.householdGoodsContainerSize}
-                                    onChange={(e) => {
-                                      handleInputChange(e)
-                                      const val = e.target.value
-                                      handleInputChange({
-                                        target: {
-                                          name: 'householdGoodsLimit',
-                                          value:
-                                            val === 'Other'
-                                              ? formData.householdGoodsContainerSizeOther
-                                              : val,
-                                        },
+                                      setFormData({
+                                        ...formData,
+                                        householdGoodsLimit: e.target.value,
                                       })
-                                    }}
-                                  >
-                                    <option value="">Select Size...</option>
-                                    <option value="20 feet">20 feet</option>
-                                    <option value="40 feet">40 feet</option>
-                                    <option value="Other">Other</option>
-                                  </CFormSelect>
-                                </CCol>
-                                {formData.householdGoodsContainerSize === 'Other' && (
-                                  <CCol md={4} className="mb-3">
-                                    <CFormLabel>Custom Container Size</CFormLabel>
-                                    <CFormInput
-                                      name="householdGoodsContainerSizeOther"
-                                      value={formData.householdGoodsContainerSizeOther}
-                                      onChange={(e) => {
-                                        handleInputChange(e)
-                                        handleInputChange({
-                                          target: {
-                                            name: 'householdGoodsLimit',
-                                            value: e.target.value,
-                                          },
-                                        })
-                                      }}
-                                    />
-                                  </CCol>
-                                )}
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-
-                          {/* Aadhar Card Fields */}
-                          {formData.servicesAuthorized.aadharCard && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Aadhar Card Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Aadhar Card Expiry Date</CFormLabel>
-                                  <CFormInput
-                                    type="date"
-                                    value={formData.serviceTracking.aadharCard.expiryDate}
-                                    onChange={(e) =>
-                                      handleServiceTrackingChange(
-                                        'aadharCard',
-                                        'expiryDate',
-                                        e.target.value,
-                                      )
                                     }
                                   />
-                                </CCol>
-                                <CCol md={6} className="mb-3">
-                                  <CFormLabel>Aadhar Card Document</CFormLabel>
-                                  <CFormInput
-                                    type="file"
-                                    onChange={(e) =>
-                                      handleCategorizedDocumentChange(
-                                        'aadharCard_document',
-                                        e.target.files,
-                                      )
-                                    }
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
+                                </div>
+                              )}
+                          </div>
+                        </CCol>
+                      ))}
+                  </CRow>
+                </div>
+              )}
 
-                          {/* Other Requirements */}
-                          {formData.servicesAuthorized.other && (
-                            <div className="mb-4">
-                              <strong className="d-block mb-2 text-primary">
-                                Other Requirements
-                              </strong>
-                              <CRow>
-                                <CCol md={12} className="mb-3">
-                                  <CFormLabel>Service Request Details</CFormLabel>
-                                  <CFormTextarea
-                                    rows={3}
-                                    name="otherServiceRequest"
-                                    value={formData.otherServiceRequest}
-                                    onChange={handleInputChange}
-                                  />
-                                </CCol>
-                              </CRow>
-                              <hr />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  <h5 className="mt-4 mb-3 border-bottom pb-2">Documents & Comments</h5>
-                  <CRow className="mb-3">
-                    <CCol xs={12} className="mb-4">
-                      <strong className="d-block mb-3">Document Uploads</strong>
-                      {generalDocuments.map((doc, idx) => (
-                        <CRow key={idx} className="mb-2 align-items-center">
+              {currentStep === 5 && (
+                <div className="fade-in">
+                  <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
+                    Step 5: Initial Milestones & Tracking
+                  </h6>
+                  <div style={{ maxHeight: '450px', overflowY: 'auto' }} className="pe-2">
+                    {formData.servicesAuthorized.homeSearch && (
+                      <div className="mb-3 p-3 border rounded bg-light border-primary-subtle">
+                        <strong className="text-primary small d-block mb-3 border-bottom pb-1">
+                          HOME SEARCH PIPELINE
+                        </strong>
+                        <CRow className="g-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">
+                              Field-visit Start Date
+                            </CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.homeSearch.startDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'homeSearch',
+                                  'startDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Expected Handover</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.homeSearch.endDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange('homeSearch', 'endDate', e.target.value)
+                              }
+                            />
+                          </CCol>
+                          <CCol md={12}>
+                            <CFormLabel className="small fw-bold">
+                              Property Address (if locked)
+                            </CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              value={formData.serviceTracking.homeSearch.propertyAddress}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'homeSearch',
+                                  'propertyAddress',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.orientationProgram && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          ORIENTATION WINDOW
+                        </strong>
+                        <CRow className="g-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Program Start</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.orientation.startDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'orientation',
+                                  'startDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Program End</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.orientation.endDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'orientation',
+                                  'endDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.visaApplication && (
+                      <div className="mb-3 p-3 border rounded bg-light border-info-subtle">
+                        <strong className="text-info small d-block mb-3 border-bottom pb-1">
+                          IMMIGRATION TIMELINE
+                        </strong>
+                        <CRow className="g-3">
                           <CCol md={4}>
+                            <CFormLabel className="small fw-bold">App Submission</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.visa.startDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange('visa', 'startDate', e.target.value)
+                              }
+                            />
+                          </CCol>
+                          <CCol md={4}>
+                            <CFormLabel className="small fw-bold">Visa Expiry Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.visa.endDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange('visa', 'endDate', e.target.value)
+                              }
+                            />
+                          </CCol>
+                          <CCol md={4}>
+                            <CFormLabel className="small fw-bold">FRRO Extension</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.visa.frroEndDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange('visa', 'frroEndDate', e.target.value)
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.aadharCard && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          AADHAR VALIDITY
+                        </strong>
+                        <CRow className="mb-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Expiry/Renewal Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.aadharCard.expiryDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'aadharCard',
+                                  'expiryDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.departure && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          DEPARTURE LOGISTICS
+                        </strong>
+                        <CRow className="mb-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">
+                              Property Handover Date
+                            </CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.departure.propertyClosureDate}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'departure',
+                                  'propertyClosureDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {!Object.values(formData.servicesAuthorized).some((v) => v === true) && (
+                      <div className="text-center py-5 text-muted">
+                        Configure services in the previous step to enable tracking milestones.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 6 && (
+                <div className="fade-in">
+                  <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
+                    Step 6: Attached Documents & Remarks
+                  </h6>
+                  <div className="bg-light p-4 rounded-3 border mb-4 shadow-inner">
+                    <p className="fw-bold small text-muted border-bottom pb-2 mb-3 tracking-widest text-uppercase">
+                      Generic Documents Management
+                    </p>
+                    <div className="mb-4">
+                      {generalDocuments.map((doc, idx) => (
+                        <div
+                          key={idx}
+                          className="mb-3 p-2 bg-white border rounded d-flex align-items-center gap-3 fade-in shadow-sm"
+                        >
+                          <div className="flex-grow-1">
                             <CFormSelect
+                              size="sm"
                               value={doc.type}
                               onChange={(e) =>
                                 handleGeneralDocumentChange(idx, 'type', e.target.value)
                               }
                             >
-                              <option value="">Select Document Type...</option>
+                              <option value="">Select Document Type</option>
                               <option value="Passport">Passport</option>
-                              <option value="Visa">Visa</option>
-                              <option value="Arrival Seal">Arrival Seal</option>
-                              <option value="House lease">House lease</option>
-                              <option value="Employment Contract">Employment Contract</option>
-                              <option value="Resume">Resume</option>
-                              <option value="Education Document">Education Document</option>
-                              <option value="Others">Others</option>
+                              <option value="Offer Letter">Offer Letter</option>
+                              <option value="Auth Letter">Client Authorization</option>
+                              <option value="ID Proof">ID Proof (Aadhar/PAN)</option>
+                              <option value="Other">Other</option>
                             </CFormSelect>
-                          </CCol>
-                          <CCol md={6}>
+                          </div>
+                          <div className="flex-grow-2 w-50">
                             <CFormInput
+                              size="sm"
                               type="file"
                               onChange={(e) =>
                                 handleGeneralDocumentChange(idx, 'file', e.target.files)
                               }
                             />
-                          </CCol>
-                          <CCol md={2}>
+                          </div>
+                          <div>
                             <CButton
                               color="danger"
-                              variant="outline"
+                              variant="ghost"
+                              size="sm"
                               onClick={() => removeGeneralDocument(idx)}
                             >
-                              Remove
+                              ✕
                             </CButton>
-                          </CCol>
-                        </CRow>
+                          </div>
+                        </div>
                       ))}
                       <CButton
-                        color="secondary"
-                        variant="outline"
+                        color="primary"
+                        variant="ghost"
                         size="sm"
-                        className="mt-2"
+                        className="fw-bold"
                         onClick={addGeneralDocument}
                       >
-                        + Add Document
+                        + Add New Document Attachment
                       </CButton>
-                    </CCol>
-                    <CCol md={12}>
-                      <CFormLabel>Additional Comments</CFormLabel>
-                      <CFormTextarea
-                        rows={4}
-                        name="additionalComments"
-                        value={formData.additionalComments}
-                        onChange={handleInputChange}
-                      />
-                    </CCol>
-                  </CRow>
-
-                  <div className="d-flex justify-content-end mt-4">
-                    <CButton color="secondary" className="me-2" onClick={() => navigate('/cases')}>
-                      Cancel
-                    </CButton>
-                    <CButton type="submit" color="primary" disabled={loading}>
-                      {loading ? <CSpinner size="sm" className="me-2" /> : null}
-                      Initiate Case
-                    </CButton>
+                    </div>
                   </div>
-                </>
+                  <div className="mb-3">
+                    <CFormLabel className="fw-bold">
+                      Other Service Requirements / Requests
+                    </CFormLabel>
+                    <CFormInput
+                      name="otherServiceRequest"
+                      value={formData.otherServiceRequest}
+                      onChange={handleInputChange}
+                      placeholder="E.g. Pet relocation, specific furniture request, etc."
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <CFormLabel className="fw-bold">
+                      Additional Comments (Internal Ops Notes)
+                    </CFormLabel>
+                    <CFormTextarea
+                      rows={3}
+                      name="additionalComments"
+                      value={formData.additionalComments}
+                      onChange={handleInputChange}
+                      placeholder="Enter any extra context for the case manager..."
+                    />
+                  </div>
+                </div>
               )}
+
+              <div className="d-flex justify-content-between mt-5 pt-3 border-top">
+                <CButton
+                  color="secondary"
+                  variant="outline"
+                  className="px-4 fw-bold"
+                  onClick={prevStep}
+                  disabled={currentStep === 1 || loading}
+                >
+                  Previous
+                </CButton>
+                {currentStep < steps.length ? (
+                  <CButton
+                    className="px-5 text-white fw-bold shadow-sm"
+                    style={{
+                      background: 'linear-gradient(45deg, #0d6efd 0%, #004dc0 100%)',
+                      border: 'none',
+                      borderRadius: '4px',
+                    }}
+                    onClick={nextStep}
+                    disabled={loading}
+                  >
+                    CONTINUE TO {steps[currentStep].toUpperCase()}
+                  </CButton>
+                ) : (
+                  <CButton
+                    className="px-5 text-white fw-bold shadow-sm"
+                    style={{
+                      background: 'linear-gradient(45deg, #198754 0%, #146c43 100%)',
+                      border: 'none',
+                      borderRadius: '4px',
+                    }}
+                    onClick={handleSubmit}
+                    disabled={loading}
+                  >
+                    {loading ? <CSpinner size="sm" className="me-2" /> : null}
+                    FINALIZE & INITIATE CASE
+                  </CButton>
+                )}
+              </div>
             </CForm>
           </CCardBody>
         </CCard>

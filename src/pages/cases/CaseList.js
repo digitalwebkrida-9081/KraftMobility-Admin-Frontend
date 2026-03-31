@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { cilHistory, cilSearch, cilTrash, cilChartPie, cilPlus, cilX, cilFilter } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import {
@@ -33,11 +34,13 @@ const MySwal = withReactContent(Swal)
 
 const CaseList = () => {
   const [cases, setCases] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedTimelineCase, setSelectedTimelineCase] = useState(null)
-  const [showTimeline, setShowTimeline] = useState(false)
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const loading = useSelector((state) => state.loading)
   const [searchParams, setSearchParams] = useSearchParams()
+const [selectedCases, setSelectedCases] = useState([])
+  const [showTimeline, setShowTimeline] = useState(false)
+  const [selectedTimelineCase, setSelectedTimelineCase] = useState(null)
 
   const statusFilter = searchParams.get('status')
   const assignedFilter = searchParams.get('assigned')
@@ -54,6 +57,7 @@ const CaseList = () => {
 
   const fetchCases = async () => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const token = localStorage.getItem('user')
         ? JSON.parse(localStorage.getItem('user')).token
         : null
@@ -67,7 +71,7 @@ const CaseList = () => {
       console.error('Error fetching cases:', error)
       toast.error('Failed to load cases')
     } finally {
-      setLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -92,6 +96,7 @@ const CaseList = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
+          dispatch({ type: 'set_loading', loading: true })
           const token = localStorage.getItem('user')
             ? JSON.parse(localStorage.getItem('user')).token
             : null
@@ -105,9 +110,67 @@ const CaseList = () => {
         } catch (error) {
           console.error('Error deleting case:', error)
           toast.error(error.response?.data?.message || 'Failed to delete case')
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
         }
       }
     })
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedCases.length === 0) return
+
+    MySwal.fire({
+      title: 'Are you sure?',
+      text: `You are about to delete ${selectedCases.length} cases. This cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ff0000',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: `Yes, delete ${selectedCases.length} cases!`,
+      customClass: {
+        confirmButton: 'swal2-confirm-danger',
+      },
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          dispatch({ type: 'set_loading', loading: true })
+          const token = localStorage.getItem('user')
+            ? JSON.parse(localStorage.getItem('user')).token
+            : null
+          await axios.post(`${BASE_API_URL}/cases/bulk-delete`, 
+            { ids: selectedCases },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          )
+          toast.success(`${selectedCases.length} cases deleted successfully`)
+          setSelectedCases([])
+          fetchCases()
+        } catch (error) {
+          console.error('Error bulk deleting cases:', error)
+          toast.error(error.response?.data?.message || 'Failed to bulk delete cases')
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
+        }
+      }
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedCases.length === filteredCases.length) {
+      setSelectedCases([])
+    } else {
+      setSelectedCases(filteredCases.map((c) => c.id))
+    }
+  }
+
+  const toggleSelectCase = (id) => {
+    setSelectedCases((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    )
   }
 
   const getStatusBadge = (status) => {
@@ -125,13 +188,6 @@ const CaseList = () => {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="text-center mt-5">
-        <CSpinner color="primary" />
-      </div>
-    )
-  }
 
   // Get user role logic (simplified)
   const userStr = localStorage.getItem('user')
@@ -182,6 +238,17 @@ const CaseList = () => {
                 <CIcon icon={cilChartPie} className="me-1" />
                 Analytics Dashboard
               </CButton>
+              {isAdmin && selectedCases.length > 0 && (
+                <CButton
+                  color="danger"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  className="d-flex align-items-center"
+                >
+                  <CIcon icon={cilTrash} className="me-1" />
+                  Bulk Delete ({selectedCases.length})
+                </CButton>
+              )}
               {isHR || isAdmin ? (
                 <CButton
                   color="primary"
@@ -196,13 +263,32 @@ const CaseList = () => {
             </div>
           </CCardHeader>
           <CCardBody>
-            {filteredCases.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-5">
+                <CSpinner color="primary" variant="grow" />
+                <p className="mt-2 text-muted">Loading cases...</p>
+              </div>
+            ) : filteredCases.length === 0 ? (
               <p className="text-center text-muted">No cases found matching the criteria.</p>
             ) : (
               <CTable hover responsive align="middle">
                 <CTableHead color="light">
                   <CTableRow>
+                    {isAdmin && (
+                      <CTableHeaderCell style={{ width: '40px' }}>
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={
+                            filteredCases.length > 0 &&
+                            selectedCases.length === filteredCases.length
+                          }
+                          onChange={toggleSelectAll}
+                        />
+                      </CTableHeaderCell>
+                    )}
                     <CTableHeaderCell>Assignee Name</CTableHeaderCell>
+                    <CTableHeaderCell>Relocation ID</CTableHeaderCell>
                     <CTableHeaderCell>Billing Entity</CTableHeaderCell>
                     <CTableHeaderCell>From &rarr; To</CTableHeaderCell>
                     <CTableHeaderCell>Status</CTableHeaderCell>
@@ -216,11 +302,24 @@ const CaseList = () => {
                 <CTableBody>
                   {filteredCases.map((caseItem) => (
                     <CTableRow key={caseItem.id}>
+                      {isAdmin && (
+                        <CTableDataCell>
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={selectedCases.includes(caseItem.id)}
+                            onChange={() => toggleSelectCase(caseItem.id)}
+                          />
+                        </CTableDataCell>
+                      )}
                       <CTableDataCell>
                         <strong>{caseItem.assigneeName}</strong>
                         <div className="small text-medium-emphasis">
                           {caseItem.officialEmailAddress}
                         </div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <strong>{caseItem.relocationId || '-'}</strong>
                       </CTableDataCell>
                       <CTableDataCell>{caseItem.billingEntity || '-'}</CTableDataCell>
                       <CTableDataCell>

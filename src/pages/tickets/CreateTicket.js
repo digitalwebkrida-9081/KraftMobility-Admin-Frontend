@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useDispatch } from 'react-redux'
 import {
   CButton,
   CCard,
@@ -22,6 +23,7 @@ const CreateTicket = () => {
   const [description, setDescription] = useState('')
   const [image, setImage] = useState(null)
   const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   useEffect(() => {
     const user = authService.getCurrentUser()
@@ -47,6 +49,7 @@ const CreateTicket = () => {
     }
 
     try {
+      dispatch({ type: 'set_loading', loading: true })
       await TicketService.createTicket(service, description, image)
       toast.success('Ticket created successfully!')
       navigate('/tickets/analytics')
@@ -57,6 +60,8 @@ const CreateTicket = () => {
         error.toString()
 
       toast.error(resMessage)
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 

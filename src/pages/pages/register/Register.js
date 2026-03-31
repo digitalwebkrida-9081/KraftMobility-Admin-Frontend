@@ -1,4 +1,5 @@
 import React from 'react'
+import { useDispatch } from 'react-redux'
 import {
   CButton,
   CCard,
@@ -28,6 +29,7 @@ const Register = () => {
   const [repeatPassword, setRepeatPassword] = React.useState('')
   const [error, setError] = React.useState('')
   const [success, setSuccess] = React.useState('')
+  const dispatch = useDispatch()
 
   const handleRegister = async (e) => {
     e.preventDefault()
@@ -52,6 +54,7 @@ const Register = () => {
     }
 
     try {
+      dispatch({ type: 'set_loading', loading: true })
       await authService.register({
         username,
         email,
@@ -63,6 +66,8 @@ const Register = () => {
       setSuccess('Registration successful! Please wait for admin approval.')
     } catch (err) {
       setError(err.message)
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 

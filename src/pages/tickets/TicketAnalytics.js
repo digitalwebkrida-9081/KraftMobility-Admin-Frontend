@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
+import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
   CButton,
@@ -70,6 +71,7 @@ import { hasPermission } from '../../utils/rolePermissions'
 
 const TicketAnalytics = () => {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const [tickets, setTickets] = useState([])
   const [stats, setStats] = useState({
     total: 0,
@@ -196,6 +198,7 @@ const TicketAnalytics = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
+        dispatch({ type: 'set_loading', loading: true })
         const response = await TicketService.getTickets()
         const data = response.data.data || response.data
         setTickets(data)
@@ -210,6 +213,8 @@ const TicketAnalytics = () => {
         checkRatedTickets(data)
       } catch (error) {
         console.error('Error fetching tickets for dashboard', error)
+      } finally {
+        dispatch({ type: 'set_loading', loading: false })
       }
     }
 
@@ -305,6 +310,7 @@ const TicketAnalytics = () => {
   // --- Handlers ---
 
   const handleStatusChange = (id, newStatus) => {
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.updateTicketStatus(id, newStatus)
       .then(() => {
         retrieveTickets(false)
@@ -313,10 +319,14 @@ const TicketAnalytics = () => {
       .catch((e) => {
         console.log(e)
       })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
+      })
   }
 
   const retrieveTickets = async (showSuccessMessage = false) => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const response = await TicketService.getTickets()
       const data = response.data.data || response.data
       setTickets(data)
@@ -336,6 +346,8 @@ const TicketAnalytics = () => {
     } catch (error) {
       console.error('Error fetching tickets', error)
       toast.error('Failed to refresh data')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -367,6 +379,7 @@ const TicketAnalytics = () => {
 
   const handleRatingSubmit = async (ticketId, rating, feedback) => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       await RatingService.createRating(ticketId, rating, feedback)
       toast.success('Thank you for your rating!')
       setRatingModalVisible(false)
@@ -385,6 +398,8 @@ const TicketAnalytics = () => {
       } else {
         toast.error('Failed to submit rating')
       }
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -402,6 +417,7 @@ const TicketAnalytics = () => {
       },
     }).then((result) => {
       if (result.isConfirmed) {
+        dispatch({ type: 'set_loading', loading: true })
         TicketService.deleteTicket(id)
           .then(() => {
             retrieveTickets()
@@ -410,6 +426,9 @@ const TicketAnalytics = () => {
           .catch((e) => {
             console.log(e)
             toast.error('Failed to delete ticket')
+          })
+          .finally(() => {
+            dispatch({ type: 'set_loading', loading: false })
           })
       }
     })
@@ -441,6 +460,9 @@ const TicketAnalytics = () => {
         console.log(e)
         toast.error('Failed to assign ticket')
       })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
+      })
   }
 
   // Notes
@@ -471,6 +493,7 @@ const TicketAnalytics = () => {
     e.preventDefault()
     if (!noteText.trim()) return
 
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.addNote(selectedTicketId, noteText)
       .then(() => {
         toast.success('Note added successfully')
@@ -485,6 +508,9 @@ const TicketAnalytics = () => {
       .catch((e) => {
         console.log(e)
         toast.error('Failed to add note')
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
 
@@ -520,6 +546,7 @@ const TicketAnalytics = () => {
     }).then((result) => {
       if (result.isConfirmed) {
         const days = result.value
+        dispatch({ type: 'set_loading', loading: true })
         TicketService.extendTicket(id, days)
           .then(() => {
             retrieveTickets()
@@ -528,6 +555,9 @@ const TicketAnalytics = () => {
           .catch((e) => {
             console.log(e)
             toast.error('Failed to extend ticket')
+          })
+          .finally(() => {
+            dispatch({ type: 'set_loading', loading: false })
           })
       }
     })
@@ -549,6 +579,7 @@ const TicketAnalytics = () => {
   }
 
   const handleEditSubmit = () => {
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.updateTicket(editingTicket.id, formData)
       .then(() => {
         setEditVisible(false)
@@ -558,6 +589,9 @@ const TicketAnalytics = () => {
       .catch((e) => {
         console.log(e)
         toast.error('Failed to update ticket')
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
 
@@ -708,6 +742,7 @@ const TicketAnalytics = () => {
 
   const handleExport = async () => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
 
@@ -780,6 +815,8 @@ const TicketAnalytics = () => {
     } catch (error) {
       console.error('Export failed', error)
       toast.error('Failed to export report')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
   // --- Review Analysis Logic ---
@@ -2119,33 +2156,21 @@ const TicketAnalytics = () => {
                                     >
                                       {item.userEmail.split('@')[0]}
                                     </span>
-                                    {item.userDetails &&
-                                      (item.userDetails.location ||
-                                        item.userDetails.propertyAddress) && (
-                                        <span
-                                          className="text-truncate text-muted"
-                                          style={{ fontSize: '0.6rem' }}
-                                          title={[
-                                            item.userDetails.location,
-                                            item.userDetails.propertyAddress,
-                                          ]
-                                            .filter(Boolean)
-                                            .join(', ')}
-                                        >
-                                          <CIcon
-                                            icon={cilUser}
-                                            size="sm"
-                                            className="me-1"
-                                            style={{ width: '10px' }}
-                                          />
-                                          {[
-                                            item.userDetails.location,
-                                            item.userDetails.propertyAddress,
-                                          ]
-                                            .filter(Boolean)
-                                            .join(', ')}
-                                        </span>
-                                      )}
+                                    {item.userDetails && item.userDetails.location && (
+                                      <span
+                                        className="text-truncate text-muted"
+                                        style={{ fontSize: '0.6rem' }}
+                                        title={item.userDetails.location}
+                                      >
+                                        <CIcon
+                                          icon={cilUser}
+                                          size="sm"
+                                          className="me-1"
+                                          style={{ width: '10px' }}
+                                        />
+                                        {item.userDetails.location}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>

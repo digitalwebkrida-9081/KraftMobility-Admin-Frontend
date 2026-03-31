@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
   CCard,
@@ -149,8 +150,8 @@ const fmt = (d) =>
 /* ── MAIN COMPONENT ── */
 const CaseAnalytics = () => {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedService, setSelectedService] = useState(null)
   const [selectedExpiryDetail, setSelectedExpiryDetail] = useState(null)
@@ -167,7 +168,7 @@ const CaseAnalytics = () => {
 
   const fetchAnalytics = async () => {
     try {
-      setLoading(true)
+      dispatch({ type: 'set_loading', loading: true })
       const token = authService.getToken()
       const res = await axios.get(`${BASE_API_URL}/cases/analytics`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -177,7 +178,7 @@ const CaseAnalytics = () => {
       console.error('Analytics fetch error:', err)
       toast.error('Failed to load analytics')
     } finally {
-      setLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -219,7 +220,7 @@ const CaseAnalytics = () => {
     }
 
     try {
-      setLoading(true)
+      dispatch({ type: 'set_loading', loading: true })
       const token = authService.getToken()
 
       const res = await axios.get(`${BASE_API_URL}/cases`, {
@@ -367,16 +368,10 @@ const CaseAnalytics = () => {
       console.error(err)
       toast.error('Export failed')
     } finally {
-      setLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
-  if (loading)
-    return (
-      <div className="text-center mt-5">
-        <CSpinner color="primary" />
-      </div>
-    )
   if (!data) return <div className="text-center mt-5 text-muted">No analytics data available</div>
 
   const s = data.summary

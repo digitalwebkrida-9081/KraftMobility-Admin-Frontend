@@ -9,6 +9,7 @@ import PrivateRoute from './components/PrivateRoute'
 
 import { CSpinner, useColorModes } from '@coreui/react'
 import './scss/style.scss'
+import Loader from './components/Loader'
 
 // We use those styles to show code examples, you should remove them in your application.
 import './scss/examples.scss'
@@ -41,6 +42,7 @@ const App = () => {
   return (
     <HashRouter>
       <AuthProvider>
+        <Loader />
         <Suspense
           fallback={
             <div className="pt-3 text-center">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch } from 'react-redux'
 import {
   CButton,
   CCard,
@@ -30,6 +31,7 @@ const MySwal = withReactContent(Swal)
 const ApprovalList = () => {
   const [users, setUsers] = useState([])
   const { getUsers, updateUser, deleteUser } = useAuth()
+  const dispatch = useDispatch()
   const [visible, setVisible] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
 
@@ -40,6 +42,7 @@ const ApprovalList = () => {
 
   const fetchUsers = async () => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       // Use backend filter for 'pending' status
       const data = await getUsers(null, null, null, 'pending')
       // If paginated format is returned (unlikely here but for safety)
@@ -48,6 +51,8 @@ const ApprovalList = () => {
     } catch (error) {
       console.error('Failed to fetch users', error)
       toast.error('Failed to fetch users')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -57,12 +62,15 @@ const ApprovalList = () => {
 
   const handleApprove = async (id) => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       await updateUser(id, { status: 'approved' })
       toast.success('User approved successfully')
       fetchUsers()
     } catch (error) {
       console.error('Failed to approve user', error)
       toast.error('Failed to approve user')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -81,6 +89,7 @@ const ApprovalList = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
+          dispatch({ type: 'set_loading', loading: true })
           // Determine if we should delete or set status to rejected.
           // For now, let's just delete the user request or set to rejected?
           // The prompt says "rejected" status exists. Let's use that.
@@ -90,6 +99,8 @@ const ApprovalList = () => {
         } catch (error) {
           console.error('Failed to reject user', error)
           toast.error('Failed to reject user')
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
         }
       }
     })

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   CButton,
   CCard,
@@ -10,6 +11,7 @@ import {
   CFormSelect,
   CFormTextarea,
   CRow,
+  CSpinner,
 } from '@coreui/react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -17,6 +19,8 @@ import { useAuth } from '../../context/AuthContext'
 const CreateUser = () => {
   const navigate = useNavigate()
   const { id } = useParams()
+  const dispatch = useDispatch()
+  const loading = useSelector((state) => state.loading)
   const { createUser, updateUser, getUsers } = useAuth()
   const [formData, setFormData] = useState({
     username: '',
@@ -33,6 +37,7 @@ const CreateUser = () => {
     if (id) {
       const fetchUser = async () => {
         try {
+          dispatch({ type: 'set_loading', loading: true })
           const users = await getUsers()
           const user = users.find((u) => u.id === parseInt(id) || u.id === id) // specific check
           if (user) {
@@ -48,6 +53,8 @@ const CreateUser = () => {
           }
         } catch (err) {
           console.error('Failed to fetch user', err)
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
         }
       }
       fetchUser()
@@ -75,6 +82,7 @@ const CreateUser = () => {
     }
 
     try {
+      dispatch({ type: 'set_loading', loading: true })
       if (id) {
         // If editing, password is optional. If empty, remove it from payload
         const dataToUpdate = { ...formData }
@@ -88,6 +96,8 @@ const CreateUser = () => {
       navigate('/users')
     } catch (err) {
       setError(err.message)
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -194,7 +204,8 @@ const CreateUser = () => {
                    <option value="End-User">End-User</option>
                 </CFormSelect>
               </div>
-              <CButton type="submit" color="primary">
+              <CButton type="submit" color="primary" disabled={loading}>
+                {loading ? <CSpinner size="sm" className="me-2" /> : null}
                 {id ? 'Update User' : 'Create User'}
               </CButton>
             </CForm>

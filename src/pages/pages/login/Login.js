@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import { useAuth } from '../../../context/AuthContext'
 import {
   CButton,
@@ -25,6 +26,7 @@ const Login = () => {
   const [error, setError] = React.useState('')
   const { login } = useAuth()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -35,10 +37,13 @@ const Login = () => {
         setError('Please enter a valid email address.')
         return
       }
+      dispatch({ type: 'set_loading', loading: true })
       await login(email, password)
       navigate('/')
     } catch (err) {
       setError(err.message || 'Failed to login. Please check your credentials.')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 

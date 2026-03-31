@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   CCard,
   CCardBody,
@@ -41,10 +42,10 @@ const MySwal = withReactContent(Swal)
 const CaseDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const loading = useSelector((state) => state.loading)
   const [caseData, setCaseData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
-  const [trackingLoading, setTrackingLoading] = useState(false)
 
   // Tracking data state per service
   const [trackingData, setTrackingData] = useState({
@@ -64,7 +65,6 @@ const CaseDetails = () => {
   const [documents, setDocuments] = useState([])
   const [documentType, setDocumentType] = useState('Milestone Update')
   const [caseManagers, setCaseManagers] = useState([])
-  const [assigningCaseManager, setAssigningCaseManager] = useState(false)
   const [selectedCaseManagerId, setSelectedCaseManagerId] = useState('')
   const [showTimeline, setShowTimeline] = useState(false)
 
@@ -109,6 +109,7 @@ const CaseDetails = () => {
 
   const fetchCaseDetails = async () => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const token = localStorage.getItem('user')
         ? JSON.parse(localStorage.getItem('user')).token
         : null
@@ -140,7 +141,7 @@ const CaseDetails = () => {
       toast.error('Failed to load case details')
       navigate('/cases')
     } finally {
-      setLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -177,7 +178,7 @@ const CaseDetails = () => {
 
   const handleUpdateTracking = async (e, serviceKey) => {
     e.preventDefault()
-    setTrackingLoading(true)
+    dispatch({ type: 'set_loading', loading: true })
 
     try {
       const token = localStorage.getItem('user')
@@ -233,13 +234,13 @@ const CaseDetails = () => {
       console.error('Update error:', error)
       toast.error(error.response?.data?.message || 'Failed to update tracking details.')
     } finally {
-      setTrackingLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
   const handleUpdateMetadata = async (e) => {
     e.preventDefault()
-    setTrackingLoading(true)
+    dispatch({ type: 'set_loading', loading: true })
 
     try {
       const token = localStorage.getItem('user')
@@ -258,12 +259,13 @@ const CaseDetails = () => {
       console.error('Update error:', error)
       toast.error('Failed to update metadata.')
     } finally {
-      setTrackingLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
   const handleStatusUpdate = async (newStatus) => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const token = localStorage.getItem('user')
         ? JSON.parse(localStorage.getItem('user')).token
         : null
@@ -279,11 +281,13 @@ const CaseDetails = () => {
       fetchCaseDetails()
     } catch (err) {
       toast.error('Could not update status')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
   const handleAssignCaseManager = async (managerId) => {
-    setAssigningCaseManager(true)
+    dispatch({ type: 'set_loading', loading: true })
     try {
       const token = localStorage.getItem('user')
         ? JSON.parse(localStorage.getItem('user')).token
@@ -300,7 +304,7 @@ const CaseDetails = () => {
     } catch (err) {
       toast.error('Could not assign Case Manager')
     } finally {
-      setAssigningCaseManager(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -319,6 +323,7 @@ const CaseDetails = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
+          dispatch({ type: 'set_loading', loading: true })
           const token = localStorage.getItem('user')
             ? JSON.parse(localStorage.getItem('user')).token
             : null
@@ -332,17 +337,24 @@ const CaseDetails = () => {
         } catch (error) {
           console.error('Error deleting case:', error)
           toast.error(error.response?.data?.message || 'Failed to delete case')
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
         }
       }
     })
   }
 
-  if (loading || !caseData) {
+  if (!caseData && loading) {
     return (
-      <div className="text-center mt-5">
-        <CSpinner color="primary" />
+      <div className="text-center py-5 mt-5">
+        <CSpinner color="primary" variant="grow" />
+        <p className="mt-2 text-muted">Loading case details...</p>
       </div>
     )
+  }
+
+  if (!caseData) {
+    return null
   }
 
   const services = caseData.servicesAuthorized || {}
@@ -494,8 +506,9 @@ const CaseDetails = () => {
                   variant="outline"
                   onClick={handleDeleteCase}
                   className="d-inline-flex align-items-center"
+                  disabled={loading}
                 >
-                  <CIcon icon={cilTrash} className="me-1" />
+                  {loading ? <CSpinner size="sm" className="me-1" /> : <CIcon icon={cilTrash} className="me-1" />}
                   Delete Case
                 </CButton>
               )}
@@ -610,7 +623,6 @@ const CaseDetails = () => {
                           }}
                           value={selectedCaseManagerId}
                           onChange={(e) => setSelectedCaseManagerId(e.target.value)}
-                          disabled={assigningCaseManager}
                         >
                           <option value="">Select Case Manager...</option>
                           {caseManagers.map((cm) => (
@@ -619,37 +631,33 @@ const CaseDetails = () => {
                             </option>
                           ))}
                         </CFormSelect>
-                        <CButton
-                          className="px-4 d-flex align-items-center justify-content-center"
-                          style={{
-                            background: 'linear-gradient(45deg, #0d6efd 0%, #004dc0 100%)',
-                            border: 'none',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 15px rgba(13, 110, 253, 0.2)',
-                            transition: 'all 0.3s ease',
-                            fontWeight: '600',
-                            color: 'white',
-                            height: '46px',
-                            whiteSpace: 'nowrap',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)'
-                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(13, 110, 253, 0.3)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(13, 110, 253, 0.2)'
-                          }}
-                          onClick={() => handleAssignCaseManager(selectedCaseManagerId)}
-                          disabled={assigningCaseManager || !selectedCaseManagerId}
-                        >
-                          {assigningCaseManager ? (
-                            <CSpinner size="sm" className="me-2" />
-                          ) : (
-                            <CIcon icon={cilCheckCircle} className="me-2" />
-                          )}
-                          Assign Case
-                        </CButton>
+                          <CButton
+                            className="px-4 d-flex align-items-center justify-content-center"
+                            style={{
+                              background: 'linear-gradient(45deg, #0d6efd 0%, #004dc0 100%)',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 15px rgba(13, 110, 253, 0.2)',
+                              transition: 'all 0.3s ease',
+                              fontWeight: '600',
+                              color: 'white',
+                              height: '46px',
+                              whiteSpace: 'nowrap',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)'
+                              e.currentTarget.style.boxShadow = '0 6px 20px rgba(13, 110, 253, 0.3)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)'
+                              e.currentTarget.style.boxShadow = '0 4px 15px rgba(13, 110, 253, 0.2)'
+                            }}
+                            onClick={() => handleAssignCaseManager(selectedCaseManagerId)}
+                            disabled={!selectedCaseManagerId || loading}
+                          >
+                            {loading ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilCheckCircle} className="me-2" />}
+                            Assign Case
+                          </CButton>
                       </div>
                     </CCol>
                   </CRow>
@@ -676,9 +684,10 @@ const CaseDetails = () => {
                             fontWeight: '600',
                           }}
                           onClick={(e) => handleUpdateMetadata(e)}
-                          disabled={trackingLoading}
+                          disabled={loading}
                         >
-                          {trackingLoading ? <CSpinner size="sm" /> : 'Update Host Phone'}
+                          {loading ? <CSpinner size="sm" className="me-2" /> : null}
+                          Update Host Phone
                         </CButton>
                       </div>
                     </CCol>
@@ -689,6 +698,10 @@ const CaseDetails = () => {
                     <h6 className="border-bottom pb-2">Assignee Information</h6>
                     <table className="table table-sm table-borderless">
                       <tbody>
+                        <tr>
+                          <td className="text-muted w-25">Relocation ID</td>
+                          <td className="fw-bold text-primary">{caseData.relocationId || '-'}</td>
+                        </tr>
                         <tr>
                           <td className="text-muted w-25">Billing Entity</td>
                           <td>{caseData.billingEntity || '-'}</td>
@@ -1015,10 +1028,9 @@ const CaseDetails = () => {
                           <CButton
                             type="submit"
                             color="primary"
-                            disabled={trackingLoading}
                             className="w-100"
                           >
-                            {trackingLoading ? <CSpinner size="sm" /> : 'Save & Upload'}
+                            Save & Upload
                           </CButton>
                         </CCol>
                       </CRow>
@@ -1163,10 +1175,9 @@ const CaseDetails = () => {
                           <CButton
                             type="submit"
                             color="primary"
-                            disabled={trackingLoading}
                             className="w-100"
                           >
-                            {trackingLoading ? <CSpinner size="sm" /> : 'Save & Upload'}
+                            Save & Upload
                           </CButton>
                         </CCol>
                       </CRow>
@@ -1460,10 +1471,9 @@ const CaseDetails = () => {
                           <CButton
                             type="submit"
                             color="primary"
-                            disabled={trackingLoading}
                             className="w-100"
                           >
-                            {trackingLoading ? <CSpinner size="sm" /> : 'Save & Upload'}
+                            Save & Upload
                           </CButton>
                         </CCol>
                       </CRow>

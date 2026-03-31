@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   CCard,
   CCardBody,
@@ -24,7 +25,8 @@ const ModulePermissions = () => {
   const [selectedModule, setSelectedModule] = useState('')
   const [permissions, setPermissions] = useState([]) // [{ role: 'Field Executive', actions: [] }]
   const [moduleConfig, setModuleConfig] = useState(null) // { name: 'tickets', actions: [...] }
-  const [loading, setLoading] = useState(false)
+  const dispatch = useDispatch()
+  const loading = useSelector((state) => state.loading)
   const [roles] = useState(['Field Executive', 'HR', 'End-User']) // Admin has all permissions by default
 
   useEffect(() => {
@@ -44,6 +46,7 @@ const ModulePermissions = () => {
 
   const fetchModules = async () => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       const data = await permissionService.getModules()
       setModules(data)
       if (data.length > 0) {
@@ -51,11 +54,13 @@ const ModulePermissions = () => {
       }
     } catch (error) {
       toast.error(error.message)
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
   const fetchPermissions = async (moduleName) => {
-    setLoading(true)
+    dispatch({ type: 'set_loading', loading: true })
     try {
       const data = await permissionService.getPermissions(moduleName)
       // Transform data into a map for easier UI handling
@@ -72,7 +77,7 @@ const ModulePermissions = () => {
     } catch (error) {
       toast.error(error.message)
     } finally {
-      setLoading(false)
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -92,10 +97,13 @@ const ModulePermissions = () => {
 
   const handleSave = async () => {
     try {
+      dispatch({ type: 'set_loading', loading: true })
       await permissionService.updatePermissions(selectedModule, permissions)
       toast.success('Permissions updated successfully')
     } catch (error) {
       toast.error(error.message)
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
     }
   }
 
@@ -121,11 +129,7 @@ const ModulePermissions = () => {
               </CFormSelect>
             </div>
 
-            {loading ? (
-              <div className="text-center">
-                <CSpinner color="primary" />
-              </div>
-            ) : moduleConfig ? (
+            {moduleConfig ? (
               <>
                 <CTable bordered>
                   <CTableHead>
@@ -159,7 +163,8 @@ const ModulePermissions = () => {
                   </CTableBody>
                 </CTable>
                 <div className="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
-                  <CButton color="primary" onClick={handleSave}>
+                  <CButton color="primary" onClick={handleSave} disabled={loading}>
+                    {loading ? <CSpinner size="sm" className="me-2" /> : null}
                     Save Changes
                   </CButton>
                 </div>

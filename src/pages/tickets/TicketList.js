@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useDispatch } from 'react-redux'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
@@ -38,6 +39,7 @@ const TicketList = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const limit = 10
+  const dispatch = useDispatch()
 
   const [userRole, setUserRole] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
@@ -96,6 +98,7 @@ const TicketList = () => {
   }, [tickets, selectedTicketId, visible])
 
   const retrieveTickets = (page = 1) => {
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.getTickets(page, limit)
       .then((response) => {
         if (response.data && response.data.data) {
@@ -112,9 +115,13 @@ const TicketList = () => {
         console.log(e)
         toast.error('Failed to retrieve tickets')
       })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
+      })
   }
 
   const handleStatusChange = (id, newStatus) => {
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.updateTicketStatus(id, newStatus)
       .then(() => {
         retrieveTickets(currentPage)
@@ -123,6 +130,9 @@ const TicketList = () => {
       .catch((e) => {
         console.log(e)
         toast.error('Failed to update ticket status')
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
 
@@ -140,6 +150,7 @@ const TicketList = () => {
       },
     }).then((result) => {
       if (result.isConfirmed) {
+        dispatch({ type: 'set_loading', loading: true })
         TicketService.deleteTicket(id)
           .then(() => {
             retrieveTickets(currentPage)
@@ -148,6 +159,9 @@ const TicketList = () => {
           .catch((e) => {
             console.log(e)
             toast.error('Failed to delete ticket')
+          })
+          .finally(() => {
+            dispatch({ type: 'set_loading', loading: false })
           })
       }
     })
@@ -185,6 +199,7 @@ const TicketList = () => {
     }).then((result) => {
       if (result.isConfirmed) {
         const days = result.value
+        dispatch({ type: 'set_loading', loading: true })
         TicketService.extendTicket(id, days)
           .then(() => {
             retrieveTickets(currentPage)
@@ -193,6 +208,9 @@ const TicketList = () => {
           .catch((e) => {
             console.log(e)
             toast.error('Failed to extend ticket')
+          })
+          .finally(() => {
+            dispatch({ type: 'set_loading', loading: false })
           })
       }
     })
@@ -214,6 +232,7 @@ const TicketList = () => {
   }
 
   const handleEditSubmit = () => {
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.updateTicket(editingTicket.id, formData)
       .then(() => {
         setVisible(false)
@@ -223,6 +242,9 @@ const TicketList = () => {
       .catch((e) => {
         console.log(e)
         toast.error('Failed to update ticket')
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
 
@@ -253,6 +275,9 @@ const TicketList = () => {
       .catch((e) => {
         console.log(e)
         toast.error('Failed to assign ticket')
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
   // --------------------
@@ -298,6 +323,7 @@ const TicketList = () => {
     e.preventDefault()
     if (!noteText.trim()) return
 
+    dispatch({ type: 'set_loading', loading: true })
     TicketService.addNote(selectedTicketId, noteText)
       .then(() => {
         setNoteText('')
@@ -307,6 +333,9 @@ const TicketList = () => {
       .catch((e) => {
         console.log(e)
         toast.error('Failed to add note')
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
 
@@ -342,6 +371,7 @@ const TicketList = () => {
   }
 
   const handleRatingSubmit = (ticketId, rating, feedback) => {
+    dispatch({ type: 'set_loading', loading: true })
     RatingService.createRating(ticketId, rating, feedback)
       .then(() => {
         setRatingModalVisible(false)
@@ -355,6 +385,9 @@ const TicketList = () => {
         } else {
           toast.error('Failed to submit rating')
         }
+      })
+      .finally(() => {
+        dispatch({ type: 'set_loading', loading: false })
       })
   }
 
@@ -407,12 +440,8 @@ const TicketList = () => {
                       {ticket.userDetails.email || ticket.userEmail || 'N/A'}
                     </div>
                     <div>
-                      <span className="text-muted">Location:</span>{' '}
+                      <span className="text-muted">City:</span>{' '}
                       {ticket.userDetails.location || 'N/A'}
-                    </div>
-                    <div>
-                      <span className="text-muted">Property Address:</span>{' '}
-                      {ticket.userDetails.propertyAddress || 'N/A'}
                     </div>
                   </div>
                 ) : ticket.userEmail ? (
