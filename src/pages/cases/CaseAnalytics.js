@@ -276,6 +276,7 @@ const CaseAnalytics = () => {
         rows.push([
           'Employee Name',
           'Employee No.',
+          'Start Date',
           'Billing Entity',
           'Relocation Type',
           'Service Authorization',
@@ -294,6 +295,7 @@ const CaseAnalytics = () => {
           rows.push([
             c.assigneeName || 'N/A',
             c.empNumber || 'N/A',
+            fmt(c.createdAt),
             c.billingEntity || 'N/A',
             c.relocationType || 'N/A',
             authStr || 'N/A',
@@ -305,6 +307,7 @@ const CaseAnalytics = () => {
         rows.push([
           'Employee Name',
           'Employee No.',
+          'Start Date',
           'Billing Entity',
           'Relocation Type',
           'Status',
@@ -325,6 +328,7 @@ const CaseAnalytics = () => {
           rows.push([
             c.assigneeName || 'N/A',
             c.empNumber || 'N/A',
+            fmt(c.createdAt),
             c.billingEntity || 'N/A',
             c.relocationType || 'N/A',
             c.status || 'N/A',
@@ -731,8 +735,9 @@ const CaseAnalytics = () => {
                             <CTableHead color="light">
                               <CTableRow>
                                 <CTableHeaderCell>Assignee</CTableHeaderCell>
+                                <CTableHeaderCell>Start Date</CTableHeaderCell>
                                 <CTableHeaderCell>Expiry Type</CTableHeaderCell>
-                                <CTableHeaderCell>Date</CTableHeaderCell>
+                                <CTableHeaderCell>Expiry Date</CTableHeaderCell>
                                 <CTableHeaderCell>Status</CTableHeaderCell>
                                 <CTableHeaderCell>Action</CTableHeaderCell>
                               </CTableRow>
@@ -747,6 +752,7 @@ const CaseAnalytics = () => {
                                   <CTableDataCell className="fw-medium">
                                     {exp.assigneeName}
                                   </CTableDataCell>
+                                  <CTableDataCell>{fmt(exp.createdAt)}</CTableDataCell>
                                   <CTableDataCell>{exp.expiryType}</CTableDataCell>
                                   <CTableDataCell>
                                     <CBadge
@@ -1116,8 +1122,9 @@ const CaseAnalytics = () => {
                     ID: {selectedExpiryDetail.empNumber}
                   </CBadge>
                 </div>
-                <div className="text-muted mt-1 small">
-                  <strong>Billing Entity:</strong> {selectedExpiryDetail.billingEntity}
+                <div className="text-muted mt-1 small d-flex gap-3">
+                  <span><strong>Billing Entity:</strong> {selectedExpiryDetail.billingEntity}</span>
+                  <span><strong>Start Date:</strong> {fmt(selectedExpiryDetail.createdAt)}</span>
                 </div>
               </div>
               <div className="mb-4">
