@@ -29,6 +29,9 @@ import {
   CModalBody,
   CModalFooter,
   CFormCheck,
+  CPagination,
+  CPaginationItem,
+  CFormSelect,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import {
@@ -159,6 +162,13 @@ const CaseAnalytics = () => {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportServices, setExportServices] = useState([])
 
+  // Pagination states
+  const [expiryPage, setExpiryPage] = useState(1)
+  const [trackingPage, setTrackingPage] = useState(1)
+  const [overduePage, setOverduePage] = useState(1)
+  const [upcomingPage, setUpcomingPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
+
   const user = authService.getCurrentUser()
   const role = user?.role || ''
 
@@ -251,19 +261,27 @@ const CaseAnalytics = () => {
           return days <= 30
         }
 
-        const formatExp = (label, d) => {
-          if (!d) return null
-          return checkUrgent(d) ? `🚨 [URGENT] ${label}: ${fmt(d)}` : `${label}: ${fmt(d)}`
+        const formatExp = (label, end, start) => {
+          if (!end) return null
+          const dateRange = start ? `${fmt(start)} – ${fmt(end)}` : fmt(end)
+          const prefix = checkUrgent(end) ? '🚨 [URGENT]' : '•'
+          return `${prefix} ${label}: ${dateRange}`
         }
 
         if (st.homeSearch?.leaseEndDate && exportServices.includes('homeSearch'))
-          exp.push(formatExp('Lease End', st.homeSearch.leaseEndDate))
+          exp.push(formatExp('Lease', st.homeSearch.leaseEndDate, st.homeSearch.leaseStartDate))
         if (st.visa?.endDate && exportServices.includes('visaApplication'))
-          exp.push(formatExp('Visa Expiry', st.visa.endDate))
+          exp.push(formatExp('Visa', st.visa.endDate, st.visa.startDate))
         if (st.visa?.frroEndDate && exportServices.includes('visaApplication'))
-          exp.push(formatExp('FRRO Expiry', st.visa.frroEndDate))
+          exp.push(formatExp('FRRO', st.visa.frroEndDate, st.visa.frroStartDate))
         if (st.tenancyManagement?.endDate && exportServices.includes('tenancyManagement'))
-          exp.push(formatExp('Tenancy End', st.tenancyManagement.endDate))
+          exp.push(
+            formatExp('Tenancy', st.tenancyManagement.endDate, st.tenancyManagement.startDate),
+          )
+        if (st.orientation?.endDate && exportServices.includes('orientationProgram'))
+          exp.push(formatExp('Orientation', st.orientation.endDate, st.orientation.startDate))
+        if (st.schoolSearch?.endDate && exportServices.includes('schoolSearch'))
+          exp.push(formatExp('School Search', st.schoolSearch.endDate, st.schoolSearch.startDate))
         if (st.aadharCard?.expiryDate && exportServices.includes('aadharCard'))
           exp.push(formatExp('Aadhar Expiry', st.aadharCard.expiryDate))
         if (st.departure?.propertyClosureDate && exportServices.includes('departure'))
@@ -276,11 +294,13 @@ const CaseAnalytics = () => {
         rows.push([
           'Employee Name',
           'Employee No.',
-          'Start Date',
+          'Relocation ID',
+          'Case Start Date',
           'Billing Entity',
+          'Employer',
           'Relocation Type',
           'Service Authorization',
-          'Expiry Dates',
+          'Start & Expiry Dates',
           'Host Phone Number',
         ])
 
@@ -288,18 +308,20 @@ const CaseAnalytics = () => {
           const auth = c.servicesAuthorized || {}
           const authStr = ALL_SERVICES.filter((s) => auth[s.key] && exportServices.includes(s.key))
             .map((s) => s.label)
-            .join(', ')
+            .join('\n')
 
           const expiries = getExpiriesList(c.serviceTracking || {})
 
           rows.push([
             c.assigneeName || 'N/A',
             c.empNumber || 'N/A',
+            c.relocationId || 'N/A',
             fmt(c.createdAt),
             c.billingEntity || 'N/A',
+            c.employer || 'N/A',
             c.relocationType || 'N/A',
             authStr || 'N/A',
-            expiries.length > 0 ? expiries.join(' | ') : 'N/A',
+            expiries.length > 0 ? expiries.join('\n') : 'N/A',
             c.hostPhoneNumber || 'N/A',
           ])
         })
@@ -307,13 +329,15 @@ const CaseAnalytics = () => {
         rows.push([
           'Employee Name',
           'Employee No.',
-          'Start Date',
+          'Relocation ID',
+          'Case Start Date',
           'Billing Entity',
+          'Employer',
           'Relocation Type',
           'Status',
           'Case Manager',
           'Service Authorization',
-          'Expiry Dates',
+          'Start & Expiry Dates',
           'Host Phone Number',
         ])
 
@@ -321,26 +345,45 @@ const CaseAnalytics = () => {
           const auth = c.servicesAuthorized || {}
           const authStr = ALL_SERVICES.filter((s) => auth[s.key] && exportServices.includes(s.key))
             .map((s) => s.label)
-            .join(', ')
+            .join('\n')
 
           const expiries = getExpiriesList(c.serviceTracking || {})
 
           rows.push([
             c.assigneeName || 'N/A',
             c.empNumber || 'N/A',
+            c.relocationId || 'N/A',
             fmt(c.createdAt),
             c.billingEntity || 'N/A',
+            c.employer || 'N/A',
             c.relocationType || 'N/A',
             c.status || 'N/A',
             c.assignedCaseManager?.username || 'Unassigned',
             authStr || 'N/A',
-            expiries.length > 0 ? expiries.join(' | ') : 'N/A',
+            expiries.length > 0 ? expiries.join('\n') : 'N/A',
             c.hostPhoneNumber || 'N/A',
           ])
         })
       }
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Service Report')
+      const ws = XLSX.utils.aoa_to_sheet(rows)
+      
+      // Auto-set column widths for readability
+      const colWidths = []
+      rows[2]?.forEach((_, i) => {
+        let maxLen = 15
+        rows.forEach(row => {
+          const val = row[i]?.toString() || ''
+          const lines = val.split('\n')
+          lines.forEach(line => {
+            if (line.length > maxLen) maxLen = line.length
+          })
+        })
+        colWidths.push({ wch: Math.min(maxLen + 2, 50) }) // Cap at 50 width
+      })
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Service Report')
 
       const s = data?.summary
       if (s) {
@@ -679,9 +722,10 @@ const CaseAnalytics = () => {
                                   : 'transparent',
                               transition: 'background 0.2s',
                             }}
-                            onClick={() =>
+                            onClick={() => {
                               setSelectedService(selectedService === svc.label ? null : svc.label)
-                            }
+                              setExpiryPage(1)
+                            }}
                           >
                             <div className="d-flex justify-content-between mb-1 small">
                               <span className="fw-medium">{svc.label}</span>
@@ -717,13 +761,19 @@ const CaseAnalytics = () => {
                   <CCard className="border-0 bg-light mt-4" style={{ borderRadius: '12px' }}>
                     <CCardHeader className="bg-transparent border-0 fw-bold">
                       <CIcon icon={cilCalendar} className="me-2" style={{ color: '#6366f1' }} />
-                      Expiry Dates for {selectedService}
+                      Start & Expiry Dates for {selectedService}
                     </CCardHeader>
                     <CCardBody className="p-0">
                       {(() => {
                         const expiries = (data.serviceExpiries || []).filter(
                           (e) => e.service === selectedService,
                         )
+                        const totalPages = Math.ceil(expiries.length / pageSize)
+                        const paginatedExpiries = expiries.slice(
+                          (expiryPage - 1) * pageSize,
+                          expiryPage * pageSize,
+                        )
+
                         if (expiries.length === 0)
                           return (
                             <div className="text-center text-muted py-4">
@@ -731,61 +781,119 @@ const CaseAnalytics = () => {
                             </div>
                           )
                         return (
-                          <CTable hover responsive align="middle" className="mb-0">
-                            <CTableHead color="light">
-                              <CTableRow>
-                                <CTableHeaderCell>Assignee</CTableHeaderCell>
-                                <CTableHeaderCell>Start Date</CTableHeaderCell>
-                                <CTableHeaderCell>Expiry Type</CTableHeaderCell>
-                                <CTableHeaderCell>Expiry Date</CTableHeaderCell>
-                                <CTableHeaderCell>Status</CTableHeaderCell>
-                                <CTableHeaderCell>Action</CTableHeaderCell>
-                              </CTableRow>
-                            </CTableHead>
-                            <CTableBody>
-                              {expiries.map((exp, idx) => (
-                                <CTableRow
-                                  key={idx}
-                                  style={{ cursor: 'pointer', transition: 'background 0.2s' }}
-                                  onClick={() => setSelectedExpiryDetail(exp)}
+                          <>
+                            <div className="d-flex justify-content-end align-items-center mb-3 px-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="small text-muted">Show:</span>
+                                <CFormSelect
+                                  size="sm"
+                                  value={pageSize}
+                                  onChange={(e) => {
+                                    setPageSize(Number(e.target.value))
+                                    setExpiryPage(1)
+                                    setTrackingPage(1)
+                                    setOverduePage(1)
+                                    setUpcomingPage(1)
+                                  }}
+                                  style={{ width: '80px' }}
                                 >
-                                  <CTableDataCell className="fw-medium">
-                                    {exp.assigneeName}
-                                  </CTableDataCell>
-                                  <CTableDataCell>{fmt(exp.createdAt)}</CTableDataCell>
-                                  <CTableDataCell>{exp.expiryType}</CTableDataCell>
-                                  <CTableDataCell>
-                                    <CBadge
-                                      color="danger"
-                                      shape="rounded-pill"
-                                      className="fw-bold px-2 py-1"
-                                      style={{ fontSize: '12px' }}
-                                    >
-                                      🚨 {fmt(exp.expiryDate)}
-                                    </CBadge>
-                                  </CTableDataCell>
-                                  <CTableDataCell>
-                                    <CBadge
-                                      color={
-                                        exp.status === 'Completed'
-                                          ? 'success'
-                                          : exp.status === 'Cancelled'
-                                            ? 'danger'
-                                            : 'warning'
-                                      }
-                                    >
-                                      {exp.status}
-                                    </CBadge>
-                                  </CTableDataCell>
-                                  <CTableDataCell>
-                                    <CButton size="sm" color="info" variant="outline">
-                                      View Details
-                                    </CButton>
-                                  </CTableDataCell>
+                                  <option value="5">5</option>
+                                  <option value="10">10</option>
+                                  <option value="50">50</option>
+                                  <option value="100">100</option>
+                                </CFormSelect>
+                              </div>
+                            </div>
+                            <CTable hover responsive align="middle" className="mb-0">
+                              <CTableHead color="light">
+                                <CTableRow>
+                                  <CTableHeaderCell>Assignee</CTableHeaderCell>
+                                  <CTableHeaderCell>Start Date</CTableHeaderCell>
+                                  <CTableHeaderCell>Expiry Type</CTableHeaderCell>
+                                  <CTableHeaderCell>Expiry Date</CTableHeaderCell>
+                                  <CTableHeaderCell>Status</CTableHeaderCell>
+                                  <CTableHeaderCell>Action</CTableHeaderCell>
                                 </CTableRow>
-                              ))}
-                            </CTableBody>
-                          </CTable>
+                              </CTableHead>
+                              <CTableBody>
+                                {paginatedExpiries.map((exp, idx) => (
+                                  <CTableRow
+                                    key={idx}
+                                    style={{ cursor: 'pointer', transition: 'background 0.2s' }}
+                                    onClick={() => setSelectedExpiryDetail(exp)}
+                                  >
+                                    <CTableDataCell className="fw-medium">
+                                      {exp.assigneeName}
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      {fmt(exp.serviceStartDate || exp.createdAt)}
+                                    </CTableDataCell>
+                                    <CTableDataCell>{exp.expiryType}</CTableDataCell>
+                                    <CTableDataCell>
+                                      <CBadge
+                                        color="danger"
+                                        shape="rounded-pill"
+                                        className="fw-bold px-2 py-1"
+                                        style={{ fontSize: '12px' }}
+                                      >
+                                        🚨 {fmt(exp.expiryDate)}
+                                      </CBadge>
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CBadge
+                                        color={
+                                          exp.status === 'Completed'
+                                            ? 'success'
+                                            : exp.status === 'Cancelled'
+                                              ? 'danger'
+                                              : 'warning'
+                                        }
+                                      >
+                                        {exp.status}
+                                      </CBadge>
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CButton size="sm" color="info" variant="outline">
+                                        View Details
+                                      </CButton>
+                                    </CTableDataCell>
+                                  </CTableRow>
+                                ))}
+                              </CTableBody>
+                            </CTable>
+                            {totalPages > 1 && (
+                              <div className="p-3 d-flex justify-content-center">
+                                <CPagination size="sm">
+                                  <CPaginationItem
+                                    disabled={expiryPage === 1}
+                                    onClick={() => setExpiryPage(expiryPage - 1)}
+                                    style={{ cursor: expiryPage === 1 ? 'default' : 'pointer' }}
+                                  >
+                                    Previous
+                                  </CPaginationItem>
+                                  {[...Array(totalPages)].map((_, i) => (
+                                    <CPaginationItem
+                                      key={i}
+                                      active={expiryPage === i + 1}
+                                      onClick={() => setExpiryPage(i + 1)}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {i + 1}
+                                    </CPaginationItem>
+                                  ))}
+                                  <CPaginationItem
+                                    disabled={expiryPage === totalPages}
+                                    onClick={() => setExpiryPage(expiryPage + 1)}
+                                    style={{
+                                      cursor: expiryPage === totalPages ? 'default' : 'pointer',
+                                    }}
+                                  >
+                                    Next
+                                  </CPaginationItem>
+                                </CPagination>
+                              </div>
+                            )}
+                          </>
                         )
                       })()}
                     </CCardBody>
@@ -806,45 +914,110 @@ const CaseAnalytics = () => {
                       Overdue Items ({data.overdueItems.length})
                     </CCardHeader>
                     <CCardBody className="p-0">
-                      <CTable hover responsive align="middle" className="mb-0">
-                        <CTableHead color="light">
-                          <CTableRow>
-                            <CTableHeaderCell>Assignee</CTableHeaderCell>
-                            <CTableHeaderCell>Service</CTableHeaderCell>
-                            <CTableHeaderCell>Type</CTableHeaderCell>
-                            <CTableHeaderCell>Deadline</CTableHeaderCell>
-                            <CTableHeaderCell>Overdue</CTableHeaderCell>
-                            <CTableHeaderCell></CTableHeaderCell>
-                          </CTableRow>
-                        </CTableHead>
-                        <CTableBody>
-                          {data.overdueItems.map((item, i) => (
-                            <CTableRow key={i}>
-                              <CTableDataCell className="fw-medium">
-                                {item.assigneeName}
-                              </CTableDataCell>
-                              <CTableDataCell>{item.service}</CTableDataCell>
-                              <CTableDataCell>{item.deadlineType}</CTableDataCell>
-                              <CTableDataCell>{fmt(item.deadline)}</CTableDataCell>
-                              <CTableDataCell>
-                                <CBadge color="danger" shape="rounded-pill">
-                                  {item.overdueDays}d overdue
-                                </CBadge>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CButton
+                      {(() => {
+                        const totalPages = Math.ceil((data.overdueItems || []).length / pageSize)
+                        const paginatedOverdue = (data.overdueItems || []).slice(
+                          (overduePage - 1) * pageSize,
+                          overduePage * pageSize,
+                        )
+                        return (
+                          <>
+                            <div className="d-flex justify-content-end align-items-center mb-3 px-3 mt-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="small text-muted">Show:</span>
+                                <CFormSelect
                                   size="sm"
-                                  color="primary"
-                                  variant="ghost"
-                                  onClick={() => navigate(`/cases/${item.caseId}`)}
+                                  value={pageSize}
+                                  onChange={(e) => {
+                                    setPageSize(Number(e.target.value))
+                                    setExpiryPage(1)
+                                    setTrackingPage(1)
+                                    setOverduePage(1)
+                                    setUpcomingPage(1)
+                                  }}
+                                  style={{ width: '80px' }}
                                 >
-                                  <CIcon icon={cilArrowRight} />
-                                </CButton>
-                              </CTableDataCell>
-                            </CTableRow>
-                          ))}
-                        </CTableBody>
-                      </CTable>
+                                  <option value="5">5</option>
+                                  <option value="10">10</option>
+                                  <option value="50">50</option>
+                                  <option value="100">100</option>
+                                </CFormSelect>
+                              </div>
+                            </div>
+                            <CTable hover responsive align="middle" className="mb-0">
+                              <CTableHead color="light">
+                                <CTableRow>
+                                  <CTableHeaderCell>Assignee</CTableHeaderCell>
+                                  <CTableHeaderCell>Service</CTableHeaderCell>
+                                  <CTableHeaderCell>Type</CTableHeaderCell>
+                                  <CTableHeaderCell>Deadline</CTableHeaderCell>
+                                  <CTableHeaderCell>Overdue</CTableHeaderCell>
+                                  <CTableHeaderCell></CTableHeaderCell>
+                                </CTableRow>
+                              </CTableHead>
+                              <CTableBody>
+                                {paginatedOverdue.map((item, i) => (
+                                  <CTableRow key={i}>
+                                    <CTableDataCell className="fw-medium">
+                                      {item.assigneeName}
+                                    </CTableDataCell>
+                                    <CTableDataCell>{item.service}</CTableDataCell>
+                                    <CTableDataCell>{item.deadlineType}</CTableDataCell>
+                                    <CTableDataCell>{fmt(item.deadline)}</CTableDataCell>
+                                    <CTableDataCell>
+                                      <CBadge color="danger" shape="rounded-pill">
+                                        {item.overdueDays}d overdue
+                                      </CBadge>
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CButton
+                                        size="sm"
+                                        color="primary"
+                                        variant="ghost"
+                                        onClick={() => navigate(`/cases/${item.caseId}`)}
+                                      >
+                                        <CIcon icon={cilArrowRight} />
+                                      </CButton>
+                                    </CTableDataCell>
+                                  </CTableRow>
+                                ))}
+                              </CTableBody>
+                            </CTable>
+                            {totalPages > 1 && (
+                              <div className="p-3 d-flex justify-content-center">
+                                <CPagination size="sm">
+                                  <CPaginationItem
+                                    disabled={overduePage === 1}
+                                    onClick={() => setOverduePage(overduePage - 1)}
+                                    style={{ cursor: overduePage === 1 ? 'default' : 'pointer' }}
+                                  >
+                                    Previous
+                                  </CPaginationItem>
+                                  {[...Array(totalPages)].map((_, i) => (
+                                    <CPaginationItem
+                                      key={i}
+                                      active={overduePage === i + 1}
+                                      onClick={() => setOverduePage(i + 1)}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {i + 1}
+                                    </CPaginationItem>
+                                  ))}
+                                  <CPaginationItem
+                                    disabled={overduePage === totalPages}
+                                    onClick={() => setOverduePage(overduePage + 1)}
+                                    style={{
+                                      cursor: overduePage === totalPages ? 'default' : 'pointer',
+                                    }}
+                                  >
+                                    Next
+                                  </CPaginationItem>
+                                </CPagination>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                     </CCardBody>
                   </CCard>
                 )}
@@ -857,43 +1030,110 @@ const CaseAnalytics = () => {
                   </CCardHeader>
                   <CCardBody className="p-0">
                     {(data.upcomingDeadlines || []).length > 0 ? (
-                      <CTable hover responsive align="middle" className="mb-0">
-                        <CTableHead color="light">
-                          <CTableRow>
-                            <CTableHeaderCell>Assignee</CTableHeaderCell>
-                            <CTableHeaderCell>Service</CTableHeaderCell>
-                            <CTableHeaderCell>Type</CTableHeaderCell>
-                            <CTableHeaderCell>Deadline</CTableHeaderCell>
-                            <CTableHeaderCell>Remaining</CTableHeaderCell>
-                            <CTableHeaderCell></CTableHeaderCell>
-                          </CTableRow>
-                        </CTableHead>
-                        <CTableBody>
-                          {data.upcomingDeadlines.map((item, i) => (
-                            <CTableRow key={i}>
-                              <CTableDataCell className="fw-medium">
-                                {item.assigneeName}
-                              </CTableDataCell>
-                              <CTableDataCell>{item.service}</CTableDataCell>
-                              <CTableDataCell>{item.deadlineType}</CTableDataCell>
-                              <CTableDataCell>{fmt(item.deadline)}</CTableDataCell>
-                              <CTableDataCell>
-                                <DeadlineBadge days={item.daysRemaining} />
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CButton
+                      (() => {
+                        const totalPages = Math.ceil(
+                          (data.upcomingDeadlines || []).length / pageSize,
+                        )
+                        const paginatedUpcoming = (data.upcomingDeadlines || []).slice(
+                          (upcomingPage - 1) * pageSize,
+                          upcomingPage * pageSize,
+                        )
+                        return (
+                          <>
+                            <div className="d-flex justify-content-end align-items-center mb-3 px-3 mt-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="small text-muted">Show:</span>
+                                <CFormSelect
                                   size="sm"
-                                  color="primary"
-                                  variant="ghost"
-                                  onClick={() => navigate(`/cases/${item.caseId}`)}
+                                  value={pageSize}
+                                  onChange={(e) => {
+                                    setPageSize(Number(e.target.value))
+                                    setExpiryPage(1)
+                                    setTrackingPage(1)
+                                    setOverduePage(1)
+                                    setUpcomingPage(1)
+                                  }}
+                                  style={{ width: '80px' }}
                                 >
-                                  <CIcon icon={cilArrowRight} />
-                                </CButton>
-                              </CTableDataCell>
-                            </CTableRow>
-                          ))}
-                        </CTableBody>
-                      </CTable>
+                                  <option value="5">5</option>
+                                  <option value="10">10</option>
+                                  <option value="50">50</option>
+                                  <option value="100">100</option>
+                                </CFormSelect>
+                              </div>
+                            </div>
+                            <CTable hover responsive align="middle" className="mb-0">
+                              <CTableHead color="light">
+                                <CTableRow>
+                                  <CTableHeaderCell>Assignee</CTableHeaderCell>
+                                  <CTableHeaderCell>Service</CTableHeaderCell>
+                                  <CTableHeaderCell>Type</CTableHeaderCell>
+                                  <CTableHeaderCell>Deadline</CTableHeaderCell>
+                                  <CTableHeaderCell>Remaining</CTableHeaderCell>
+                                  <CTableHeaderCell></CTableHeaderCell>
+                                </CTableRow>
+                              </CTableHead>
+                              <CTableBody>
+                                {paginatedUpcoming.map((item, i) => (
+                                  <CTableRow key={i}>
+                                    <CTableDataCell className="fw-medium">
+                                      {item.assigneeName}
+                                    </CTableDataCell>
+                                    <CTableDataCell>{item.service}</CTableDataCell>
+                                    <CTableDataCell>{item.deadlineType}</CTableDataCell>
+                                    <CTableDataCell>{fmt(item.deadline)}</CTableDataCell>
+                                    <CTableDataCell>
+                                      <DeadlineBadge days={item.daysRemaining} />
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CButton
+                                        size="sm"
+                                        color="primary"
+                                        variant="ghost"
+                                        onClick={() => navigate(`/cases/${item.caseId}`)}
+                                      >
+                                        <CIcon icon={cilArrowRight} />
+                                      </CButton>
+                                    </CTableDataCell>
+                                  </CTableRow>
+                                ))}
+                              </CTableBody>
+                            </CTable>
+                            {totalPages > 1 && (
+                              <div className="p-3 d-flex justify-content-center">
+                                <CPagination size="sm">
+                                  <CPaginationItem
+                                    disabled={upcomingPage === 1}
+                                    onClick={() => setUpcomingPage(upcomingPage - 1)}
+                                    style={{ cursor: upcomingPage === 1 ? 'default' : 'pointer' }}
+                                  >
+                                    Previous
+                                  </CPaginationItem>
+                                  {[...Array(totalPages)].map((_, i) => (
+                                    <CPaginationItem
+                                      key={i}
+                                      active={upcomingPage === i + 1}
+                                      onClick={() => setUpcomingPage(i + 1)}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {i + 1}
+                                    </CPaginationItem>
+                                  ))}
+                                  <CPaginationItem
+                                    disabled={upcomingPage === totalPages}
+                                    onClick={() => setUpcomingPage(upcomingPage + 1)}
+                                    style={{
+                                      cursor: upcomingPage === totalPages ? 'default' : 'pointer',
+                                    }}
+                                  >
+                                    Next
+                                  </CPaginationItem>
+                                </CPagination>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()
                     ) : (
                       <div className="text-center text-muted py-4">No upcoming deadlines</div>
                     )}
@@ -908,81 +1148,148 @@ const CaseAnalytics = () => {
                   </CCardHeader>
                   <CCardBody className="p-0">
                     {(data.serviceTrackingEntries || []).length > 0 ? (
-                      <CTable
-                        hover
-                        responsive
-                        align="middle"
-                        className="mb-0"
-                        style={{ fontSize: '0.875rem' }}
-                      >
-                        <CTableHead color="light">
-                          <CTableRow>
-                            <CTableHeaderCell>Assignee</CTableHeaderCell>
-                            <CTableHeaderCell>Service</CTableHeaderCell>
-                            <CTableHeaderCell>Start Date</CTableHeaderCell>
-                            <CTableHeaderCell>End Date</CTableHeaderCell>
-                            <CTableHeaderCell>Case Status</CTableHeaderCell>
-                            <CTableHeaderCell>Details</CTableHeaderCell>
-                            <CTableHeaderCell></CTableHeaderCell>
-                          </CTableRow>
-                        </CTableHead>
-                        <CTableBody>
-                          {data.serviceTrackingEntries.map((entry, i) => (
-                            <CTableRow key={i}>
-                              <CTableDataCell className="fw-medium">
-                                {entry.assigneeName}
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CBadge color="light" textColor="dark">
-                                  {entry.service}
-                                </CBadge>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                {entry.startDate ? (
-                                  <span className="text-success">{fmt(entry.startDate)}</span>
-                                ) : (
-                                  <span className="text-muted">—</span>
-                                )}
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                {entry.endDate ? (
-                                  <span className="text-danger">{fmt(entry.endDate)}</span>
-                                ) : (
-                                  <span className="text-muted">—</span>
-                                )}
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CBadge
-                                  color={
-                                    entry.status === 'Completed'
-                                      ? 'success'
-                                      : entry.status === 'In Progress'
-                                        ? 'warning'
-                                        : entry.status === 'Cancelled'
-                                          ? 'danger'
-                                          : 'primary'
-                                  }
-                                >
-                                  {entry.status}
-                                </CBadge>
-                              </CTableDataCell>
-                              <CTableDataCell className="text-muted small">
-                                {entry.details || '—'}
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CButton
+                      (() => {
+                        const totalPages = Math.ceil(
+                          (data.serviceTrackingEntries || []).length / pageSize,
+                        )
+                        const paginatedTracking = (data.serviceTrackingEntries || []).slice(
+                          (trackingPage - 1) * pageSize,
+                          trackingPage * pageSize,
+                        )
+                        return (
+                          <>
+                            <div className="d-flex justify-content-end align-items-center mb-3 px-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="small text-muted">Show:</span>
+                                <CFormSelect
                                   size="sm"
-                                  color="primary"
-                                  variant="ghost"
-                                  onClick={() => navigate(`/cases/${entry.caseId}`)}
+                                  value={pageSize}
+                                  onChange={(e) => {
+                                    setPageSize(Number(e.target.value))
+                                    setExpiryPage(1)
+                                    setTrackingPage(1)
+                                    setOverduePage(1)
+                                    setUpcomingPage(1)
+                                  }}
+                                  style={{ width: '80px' }}
                                 >
-                                  <CIcon icon={cilArrowRight} />
-                                </CButton>
-                              </CTableDataCell>
-                            </CTableRow>
-                          ))}
-                        </CTableBody>
-                      </CTable>
+                                  <option value="5">5</option>
+                                  <option value="10">10</option>
+                                  <option value="50">50</option>
+                                  <option value="100">100</option>
+                                </CFormSelect>
+                              </div>
+                            </div>
+                            <CTable
+                              hover
+                              responsive
+                              align="middle"
+                              className="mb-0"
+                              style={{ fontSize: '0.875rem' }}
+                            >
+                              <CTableHead color="light">
+                                <CTableRow>
+                                  <CTableHeaderCell>Assignee</CTableHeaderCell>
+                                  <CTableHeaderCell>Service</CTableHeaderCell>
+                                  <CTableHeaderCell>Start Date</CTableHeaderCell>
+                                  <CTableHeaderCell>End Date</CTableHeaderCell>
+                                  <CTableHeaderCell>Case Status</CTableHeaderCell>
+                                  <CTableHeaderCell>Details</CTableHeaderCell>
+                                  <CTableHeaderCell></CTableHeaderCell>
+                                </CTableRow>
+                              </CTableHead>
+                              <CTableBody>
+                                {paginatedTracking.map((entry, i) => (
+                                  <CTableRow key={i}>
+                                    <CTableDataCell className="fw-medium">
+                                      {entry.assigneeName}
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CBadge color="light" textColor="dark">
+                                        {entry.service}
+                                      </CBadge>
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      {entry.startDate ? (
+                                        <span className="text-success">{fmt(entry.startDate)}</span>
+                                      ) : (
+                                        <span className="text-muted">—</span>
+                                      )}
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      {entry.endDate ? (
+                                        <span className="text-danger">{fmt(entry.endDate)}</span>
+                                      ) : (
+                                        <span className="text-muted">—</span>
+                                      )}
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CBadge
+                                        color={
+                                          entry.status === 'Completed'
+                                            ? 'success'
+                                            : entry.status === 'In Progress'
+                                              ? 'warning'
+                                              : entry.status === 'Cancelled'
+                                                ? 'danger'
+                                                : 'primary'
+                                        }
+                                      >
+                                        {entry.status}
+                                      </CBadge>
+                                    </CTableDataCell>
+                                    <CTableDataCell className="text-muted small">
+                                      {entry.details || '—'}
+                                    </CTableDataCell>
+                                    <CTableDataCell>
+                                      <CButton
+                                        size="sm"
+                                        color="primary"
+                                        variant="ghost"
+                                        onClick={() => navigate(`/cases/${entry.caseId}`)}
+                                      >
+                                        <CIcon icon={cilArrowRight} />
+                                      </CButton>
+                                    </CTableDataCell>
+                                  </CTableRow>
+                                ))}
+                              </CTableBody>
+                            </CTable>
+                            {totalPages > 1 && (
+                              <div className="p-3 d-flex justify-content-center">
+                                <CPagination size="sm">
+                                  <CPaginationItem
+                                    disabled={trackingPage === 1}
+                                    onClick={() => setTrackingPage(trackingPage - 1)}
+                                    style={{ cursor: trackingPage === 1 ? 'default' : 'pointer' }}
+                                  >
+                                    Previous
+                                  </CPaginationItem>
+                                  {[...Array(totalPages)].map((_, i) => (
+                                    <CPaginationItem
+                                      key={i}
+                                      active={trackingPage === i + 1}
+                                      onClick={() => setTrackingPage(i + 1)}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {i + 1}
+                                    </CPaginationItem>
+                                  ))}
+                                  <CPaginationItem
+                                    disabled={trackingPage === totalPages}
+                                    onClick={() => setTrackingPage(trackingPage + 1)}
+                                    style={{
+                                      cursor: trackingPage === totalPages ? 'default' : 'pointer',
+                                    }}
+                                  >
+                                    Next
+                                  </CPaginationItem>
+                                </CPagination>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()
                     ) : (
                       <div className="text-center text-muted py-4">
                         No service dates tracked yet
@@ -1123,8 +1430,13 @@ const CaseAnalytics = () => {
                   </CBadge>
                 </div>
                 <div className="text-muted mt-1 small d-flex gap-3">
-                  <span><strong>Billing Entity:</strong> {selectedExpiryDetail.billingEntity}</span>
-                  <span><strong>Start Date:</strong> {fmt(selectedExpiryDetail.createdAt)}</span>
+                  <span>
+                    <strong>Billing Entity:</strong> {selectedExpiryDetail.billingEntity}
+                  </span>
+                  <span>
+                    <strong>Start Date:</strong>{' '}
+                    {fmt(selectedExpiryDetail.serviceStartDate || selectedExpiryDetail.createdAt)}
+                  </span>
                 </div>
               </div>
               <div className="mb-4">

@@ -23,6 +23,9 @@ import {
   CModalBody,
   CModalFooter,
   CTooltip,
+  CPagination,
+  CPaginationItem,
+  CFormSelect,
 } from '@coreui/react'
 import axios from 'axios'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -41,6 +44,8 @@ const CaseList = () => {
 const [selectedCases, setSelectedCases] = useState([])
   const [showTimeline, setShowTimeline] = useState(false)
   const [selectedTimelineCase, setSelectedTimelineCase] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const statusFilter = searchParams.get('status')
   const assignedFilter = searchParams.get('assigned')
@@ -80,6 +85,10 @@ const [selectedCases, setSelectedCases] = useState([])
     if (assignedFilter === 'unassigned' && c.assignedCaseManager) return false
     return true
   })
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCases.length / pageSize)
+  const paginatedCases = filteredCases.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const handleDelete = async (caseId) => {
     MySwal.fire({
@@ -268,129 +277,189 @@ const [selectedCases, setSelectedCases] = useState([])
                 <CSpinner color="primary" variant="grow" />
                 <p className="mt-2 text-muted">Loading cases...</p>
               </div>
-            ) : filteredCases.length === 0 ? (
-              <p className="text-center text-muted">No cases found matching the criteria.</p>
             ) : (
-              <CTable hover responsive align="middle">
-                <CTableHead color="light">
-                  <CTableRow>
-                    {isAdmin && (
-                      <CTableHeaderCell style={{ width: '40px' }}>
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          checked={
-                            filteredCases.length > 0 &&
-                            selectedCases.length === filteredCases.length
-                          }
-                          onChange={toggleSelectAll}
-                        />
-                      </CTableHeaderCell>
-                    )}
-                    <CTableHeaderCell>Assignee Name</CTableHeaderCell>
-                    <CTableHeaderCell>Relocation ID</CTableHeaderCell>
-                    <CTableHeaderCell>Billing Entity</CTableHeaderCell>
-                    <CTableHeaderCell>From &rarr; To</CTableHeaderCell>
-                    <CTableHeaderCell>Status</CTableHeaderCell>
-                    <CTableHeaderCell>Case Manager</CTableHeaderCell>
-                    <CTableHeaderCell>Created Date</CTableHeaderCell>
-                    <CTableHeaderCell className="text-center" style={{ width: '120px' }}>
-                      Actions
-                    </CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
-                <CTableBody>
-                  {filteredCases.map((caseItem) => (
-                    <CTableRow key={caseItem.id}>
+              <>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="text-muted small">
+                    Showing {Math.min(filteredCases.length, (currentPage - 1) * pageSize + 1)} to {Math.min(filteredCases.length, currentPage * pageSize)} of {filteredCases.length} entries
+                  </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="small text-muted">Show:</span>
+                    <CFormSelect
+                      size="sm"
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value))
+                        setCurrentPage(1)
+                      }}
+                      style={{ width: '80px' }}
+                    >
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </CFormSelect>
+                  </div>
+                </div>
+
+                {filteredCases.length === 0 ? (
+                  <p className="text-center text-muted">No cases found matching the criteria.</p>
+                ) : (
+                  <>
+                    <CTable hover responsive align="middle">
+                  <CTableHead color="light">
+                    <CTableRow>
                       {isAdmin && (
-                        <CTableDataCell>
+                        <CTableHeaderCell style={{ width: '40px' }}>
                           <input
                             type="checkbox"
                             className="form-check-input"
-                            checked={selectedCases.includes(caseItem.id)}
-                            onChange={() => toggleSelectCase(caseItem.id)}
+                            checked={
+                              filteredCases.length > 0 &&
+                              selectedCases.length === filteredCases.length
+                            }
+                            onChange={toggleSelectAll}
                           />
-                        </CTableDataCell>
+                        </CTableHeaderCell>
                       )}
-                      <CTableDataCell>
-                        <strong>{caseItem.assigneeName}</strong>
-                        <div className="small text-medium-emphasis">
-                          {caseItem.officialEmailAddress}
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <strong>{caseItem.relocationId || '-'}</strong>
-                      </CTableDataCell>
-                      <CTableDataCell>{caseItem.billingEntity || '-'}</CTableDataCell>
-                      <CTableDataCell>
-                        {caseItem.relocationType === 'Domestic' ? (
-                          <>
-                            {caseItem.movingFromCity || '?'} &rarr; {caseItem.city || '?'}
-                          </>
-                        ) : (
-                          <>
-                            {caseItem.movingFromCountry || '?'} &rarr;{' '}
-                            {caseItem.movingToCountry || '?'}
-                          </>
+                      <CTableHeaderCell>Assignee Name</CTableHeaderCell>
+                      <CTableHeaderCell>Relocation ID</CTableHeaderCell>
+                      <CTableHeaderCell>Billing Entity</CTableHeaderCell>
+                      <CTableHeaderCell>From &rarr; To</CTableHeaderCell>
+                      <CTableHeaderCell>Status</CTableHeaderCell>
+                      <CTableHeaderCell>Case Manager</CTableHeaderCell>
+                      <CTableHeaderCell>Created Date</CTableHeaderCell>
+                      <CTableHeaderCell className="text-center" style={{ width: '120px' }}>
+                        Actions
+                      </CTableHeaderCell>
+                    </CTableRow>
+                  </CTableHead>
+                  <CTableBody>
+                    {paginatedCases.map((caseItem) => (
+                      <CTableRow key={caseItem.id}>
+                        {isAdmin && (
+                          <CTableDataCell>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={selectedCases.includes(caseItem.id)}
+                              onChange={() => toggleSelectCase(caseItem.id)}
+                            />
+                          </CTableDataCell>
                         )}
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge color={getStatusBadge(caseItem.status)}>{caseItem.status}</CBadge>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        {caseItem.assignedCaseManager?.username || (
-                          <span className="text-muted">Unassigned</span>
-                        )}
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        {new Date(caseItem.createdAt).toLocaleDateString()}
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="d-flex gap-1 justify-content-center">
-                          <CTooltip content="View Details">
-                            <CButton
-                              color="info"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/cases/${caseItem.id}`)}
-                            >
-                              <CIcon icon={cilSearch} />
-                            </CButton>
-                          </CTooltip>
-                          <CTooltip content="Case Timeline">
-                            <CButton
-                              color="secondary"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedTimelineCase(caseItem)
-                                setShowTimeline(true)
-                              }}
-                            >
-                              <CIcon icon={cilHistory} />
-                            </CButton>
-                          </CTooltip>
-                          {isAdmin && (
-                            <CTooltip content="Delete Case">
+                        <CTableDataCell>
+                          <strong>{caseItem.assigneeName}</strong>
+                          <div className="small text-medium-emphasis">
+                            {caseItem.officialEmailAddress}
+                          </div>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <strong>{caseItem.relocationId || '-'}</strong>
+                        </CTableDataCell>
+                        <CTableDataCell>{caseItem.billingEntity || '-'}</CTableDataCell>
+                        <CTableDataCell>
+                          {caseItem.relocationType === 'Domestic' ? (
+                            <>
+                              {caseItem.movingFromCity || '?'} &rarr; {caseItem.city || '?'}
+                            </>
+                          ) : (
+                            <>
+                              {caseItem.movingFromCountry || '?'} &rarr;{' '}
+                              {caseItem.movingToCountry || '?'}
+                            </>
+                          )}
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <CBadge color={getStatusBadge(caseItem.status)}>{caseItem.status}</CBadge>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          {caseItem.assignedCaseManager?.username || (
+                            <span className="text-muted">Unassigned</span>
+                          )}
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          {new Date(caseItem.createdAt).toLocaleDateString()}
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <div className="d-flex gap-1 justify-content-center">
+                            <CTooltip content="View Details">
                               <CButton
-                                color="danger"
+                                color="info"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDelete(caseItem.id)}
+                                onClick={() => navigate(`/cases/${caseItem.id}`)}
                               >
-                                <CIcon icon={cilTrash} />
+                                <CIcon icon={cilSearch} />
                               </CButton>
                             </CTooltip>
-                          )}
-                        </div>
-                      </CTableDataCell>
-                    </CTableRow>
-                  ))}
-                </CTableBody>
-              </CTable>
+                            <CTooltip content="Case Timeline">
+                              <CButton
+                                color="secondary"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedTimelineCase(caseItem)
+                                  setShowTimeline(true)
+                                }}
+                              >
+                                <CIcon icon={cilHistory} />
+                              </CButton>
+                            </CTooltip>
+                            {isAdmin && (
+                              <CTooltip content="Delete Case">
+                                <CButton
+                                  color="danger"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(caseItem.id)}
+                                >
+                                  <CIcon icon={cilTrash} />
+                                </CButton>
+                              </CTooltip>
+                            )}
+                          </div>
+                        </CTableDataCell>
+                      </CTableRow>
+                    ))}
+                  </CTableBody>
+                </CTable>
+                
+                {totalPages > 1 && (
+                  <div className="d-flex justify-content-center mt-3">
+                    <CPagination aria-label="Page navigation example">
+                      <CPaginationItem 
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        style={{ cursor: currentPage === 1 ? 'default' : 'pointer' }}
+                      >
+                        Previous
+                      </CPaginationItem>
+                      {[...Array(totalPages)].map((_, i) => (
+                        <CPaginationItem
+                          key={i + 1}
+                          active={currentPage === i + 1}
+                          onClick={() => setCurrentPage(i + 1)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {i + 1}
+                        </CPaginationItem>
+                      ))}
+                      <CPaginationItem 
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        style={{ cursor: currentPage === totalPages ? 'default' : 'pointer' }}
+                      >
+                        Next
+                      </CPaginationItem>
+                    </CPagination>
+                  </div>
+                )}
+              </>
             )}
-          </CCardBody>
-        </CCard>
+          </>
+        )}
+      </CCardBody>
+    </CCard>
       </CCol>
 
       {/* Timeline Modal */}
