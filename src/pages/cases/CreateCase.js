@@ -214,6 +214,14 @@ const COUNTRY_LIST = [
   'Zimbabwe',
 ]
 
+const EMPLOYER_ORGANIZATIONS = [
+  'Tata Electronics Products and Solutions Private Limited (TEPS)',
+  'TATA Electronics Pvt Ltd(TEPL)',
+  'TATA ELECTRONICS SYSTEMS SOLUTIONS PRIVATE LIMITED',
+  'TATA SemiConductor and Assembly and Test Pvt Ltd(TSAT)',
+  'TATA SemiConductor Manufacturing Pvt Ltd(TSMPL)',
+]
+
 const CreateCase = () => {
   const [formData, setFormData] = useState({
     relocationId: '',
@@ -307,6 +315,7 @@ const CreateCase = () => {
   })
 
   const [currentStep, setCurrentStep] = useState(1)
+  const [isManualEmployer, setIsManualEmployer] = useState(false)
   const steps = ['Basics', 'Relocation', 'Family', 'Services', 'Tracking', 'Documents']
 
   const [generalDocuments, setGeneralDocuments] = useState([])
@@ -334,6 +343,17 @@ const CreateCase = () => {
       }))
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }))
+    }
+  }
+
+  const handleEmployerChange = (e) => {
+    const { value } = e.target
+    if (value === 'OTHER') {
+      setIsManualEmployer(true)
+      setFormData((prev) => ({ ...prev, employer: '' }))
+    } else {
+      setIsManualEmployer(false)
+      setFormData((prev) => ({ ...prev, employer: value }))
     }
   }
 
@@ -622,11 +642,40 @@ const CreateCase = () => {
                           <CFormLabel className="small fw-bold text-muted">
                             Employer Organization
                           </CFormLabel>
-                          <CFormInput
-                            name="employer"
-                            value={formData.employer}
-                            onChange={handleInputChange}
-                          />
+                          <div className="d-flex flex-column gap-2">
+                            <CFormSelect
+                              name="employerDropdown"
+                              value={
+                                isManualEmployer
+                                  ? 'OTHER'
+                                  : EMPLOYER_ORGANIZATIONS.includes(formData.employer)
+                                    ? formData.employer
+                                    : formData.employer === ''
+                                      ? ''
+                                      : 'OTHER'
+                              }
+                              onChange={handleEmployerChange}
+                            >
+                              <option value="">Select Employer...</option>
+                              {EMPLOYER_ORGANIZATIONS.map((org) => (
+                                <option key={org} value={org}>
+                                  {org}
+                                </option>
+                              ))}
+                              <option value="OTHER">Other / Type Manually...</option>
+                            </CFormSelect>
+                            {isManualEmployer && (
+                              <div className="fade-in mt-1">
+                                <CFormInput
+                                  name="employer"
+                                  value={formData.employer}
+                                  onChange={handleInputChange}
+                                  placeholder="Enter Company Name Manually"
+                                  autoFocus
+                                />
+                              </div>
+                            )}
+                          </div>
                         </CCol>
                       </CRow>
                       <CRow className="mb-3">

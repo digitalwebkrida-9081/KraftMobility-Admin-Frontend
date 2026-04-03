@@ -39,6 +39,14 @@ import withReactContent from 'sweetalert2-react-content'
 
 const MySwal = withReactContent(Swal)
 
+const EMPLOYER_ORGANIZATIONS = [
+  'Tata Electronics Products and Solutions Private Limited (TEPS)',
+  'TATA Electronics Pvt Ltd(TEPL)',
+  'TATA ELECTRONICS SYSTEMS SOLUTIONS PRIVATE LIMITED',
+  'TATA SemiConductor and Assembly and Test Pvt Ltd(TSAT)',
+  'TATA SemiConductor Manufacturing Pvt Ltd(TSMPL)',
+]
+
 const CaseDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -60,7 +68,9 @@ const CaseDetails = () => {
     visaDetails: {},
     servicesAuthorized: {},
     hostPhoneNumber: '',
+    employer: '',
   })
+  const [isManualEmployer, setIsManualEmployer] = useState(false)
 
   const [documents, setDocuments] = useState([])
   const [documentType, setDocumentType] = useState('Milestone Update')
@@ -135,7 +145,9 @@ const CaseDetails = () => {
         visaDetails: data.visaDetails || {},
         servicesAuthorized: data.servicesAuthorized || {},
         hostPhoneNumber: data.hostPhoneNumber || '',
+        employer: data.employer || '',
       })
+      setIsManualEmployer(!EMPLOYER_ORGANIZATIONS.includes(data.employer || '') && data.employer !== '')
     } catch (error) {
       console.error('Error fetching case:', error)
       toast.error('Failed to load case details')
@@ -248,7 +260,8 @@ const CaseDetails = () => {
         : null
 
       await axios.put(`${BASE_API_URL}/cases/${id}/tracking`, {
-        hostPhoneNumber: trackingData.hostPhoneNumber
+        hostPhoneNumber: trackingData.hostPhoneNumber,
+        employer: trackingData.employer
       }, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -260,6 +273,17 @@ const CaseDetails = () => {
       toast.error('Failed to update metadata.')
     } finally {
       dispatch({ type: 'set_loading', loading: false })
+    }
+  }
+
+  const handleEmployerChange = (e) => {
+    const { value } = e.target
+    if (value === 'OTHER') {
+      setIsManualEmployer(true)
+      setTrackingData((prev) => ({ ...prev, employer: '' }))
+    } else {
+      setIsManualEmployer(false)
+      setTrackingData((prev) => ({ ...prev, employer: value }))
     }
   }
 
@@ -664,16 +688,51 @@ const CaseDetails = () => {
                 )}
                 {isCaseManagerOrAdmin && (
                   <CRow className="mb-4">
-                    <CCol md={6}>
-                      <h6 className="border-bottom pb-2">Host Contact Details</h6>
-                      <div className="d-flex align-items-center">
-                        <CFormInput
-                          className="me-2"
-                          placeholder="Host Phone Number..."
-                          value={trackingData.hostPhoneNumber}
-                          onChange={(e) => handleRootTrackingChange('hostPhoneNumber', e.target.value)}
-                          style={{ borderRadius: '8px', height: '48px' }}
-                        />
+                    <CCol md={12}>
+                      <h6 className="border-bottom pb-2">Case Metadata (Employer & Contact)</h6>
+                      <div className="d-flex align-items-end gap-3 flex-wrap">
+                        <div style={{ minWidth: '300px' }}>
+                          <CFormLabel className="small fw-bold text-muted">Employer Organization</CFormLabel>
+                          <CFormSelect
+                            value={
+                              isManualEmployer
+                                ? 'OTHER'
+                                : EMPLOYER_ORGANIZATIONS.includes(trackingData.employer)
+                                  ? trackingData.employer
+                                  : trackingData.employer === ''
+                                    ? ''
+                                    : 'OTHER'
+                            }
+                            onChange={handleEmployerChange}
+                            style={{ borderRadius: '8px', height: '48px' }}
+                          >
+                            <option value="">Select Employer...</option>
+                            {EMPLOYER_ORGANIZATIONS.map((org) => (
+                              <option key={org} value={org}>
+                                {org}
+                              </option>
+                            ))}
+                            <option value="OTHER">Other / Type Manually...</option>
+                          </CFormSelect>
+                          {isManualEmployer && (
+                            <CFormInput
+                              className="mt-2"
+                              placeholder="Type company name..."
+                              value={trackingData.employer}
+                              onChange={(e) => handleRootTrackingChange('employer', e.target.value)}
+                              style={{ borderRadius: '8px', height: '48px' }}
+                            />
+                          )}
+                        </div>
+                        <div style={{ minWidth: '200px' }}>
+                          <CFormLabel className="small fw-bold text-muted">Host Phone Number</CFormLabel>
+                          <CFormInput
+                            placeholder="Host Phone Number..."
+                            value={trackingData.hostPhoneNumber}
+                            onChange={(e) => handleRootTrackingChange('hostPhoneNumber', e.target.value)}
+                            style={{ borderRadius: '8px', height: '48px' }}
+                          />
+                        </div>
                         <CButton
                           color="primary"
                           className="px-4 d-flex align-items-center justify-content-center"
@@ -687,7 +746,7 @@ const CaseDetails = () => {
                           disabled={loading}
                         >
                           {loading ? <CSpinner size="sm" className="me-2" /> : null}
-                          Update Host Phone
+                          Update Metadata
                         </CButton>
                       </div>
                     </CCol>

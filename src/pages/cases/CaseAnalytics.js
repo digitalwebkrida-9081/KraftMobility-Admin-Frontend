@@ -252,8 +252,8 @@ const CaseAnalytics = () => {
       rows.push([reportTitle])
       rows.push([]) // empty row spacer
 
-      const getExpiriesList = (st) => {
-        const exp = []
+      const getExpiriesDetailed = (st) => {
+        const results = []
         const now = new Date()
         const checkUrgent = (dateStr) => {
           if (!dateStr) return false
@@ -261,33 +261,34 @@ const CaseAnalytics = () => {
           return days <= 30
         }
 
-        const formatExp = (label, end, start) => {
-          if (!end) return null
-          const dateRange = start ? `${fmt(start)} – ${fmt(end)}` : fmt(end)
-          const prefix = checkUrgent(end) ? '🚨 [URGENT]' : '•'
-          return `${prefix} ${label}: ${dateRange}`
+        const addExp = (label, end, start) => {
+          if (!end) return
+          const isUrgent = checkUrgent(end)
+          results.push({
+            label: isUrgent ? `🚨 [URGENT] ${label}` : `• ${label}`,
+            start: start ? fmt(start) : '—',
+            end: fmt(end),
+          })
         }
 
         if (st.homeSearch?.leaseEndDate && exportServices.includes('homeSearch'))
-          exp.push(formatExp('Lease', st.homeSearch.leaseEndDate, st.homeSearch.leaseStartDate))
+          addExp('Lease', st.homeSearch.leaseEndDate, st.homeSearch.leaseStartDate)
         if (st.visa?.endDate && exportServices.includes('visaApplication'))
-          exp.push(formatExp('Visa', st.visa.endDate, st.visa.startDate))
+          addExp('Visa', st.visa.endDate, st.visa.startDate)
         if (st.visa?.frroEndDate && exportServices.includes('visaApplication'))
-          exp.push(formatExp('FRRO', st.visa.frroEndDate, st.visa.frroStartDate))
+          addExp('FRRO', st.visa.frroEndDate, st.visa.frroStartDate)
         if (st.tenancyManagement?.endDate && exportServices.includes('tenancyManagement'))
-          exp.push(
-            formatExp('Tenancy', st.tenancyManagement.endDate, st.tenancyManagement.startDate),
-          )
+          addExp('Tenancy', st.tenancyManagement.endDate, st.tenancyManagement.startDate)
         if (st.orientation?.endDate && exportServices.includes('orientationProgram'))
-          exp.push(formatExp('Orientation', st.orientation.endDate, st.orientation.startDate))
+          addExp('Orientation', st.orientation.endDate, st.orientation.startDate)
         if (st.schoolSearch?.endDate && exportServices.includes('schoolSearch'))
-          exp.push(formatExp('School Search', st.schoolSearch.endDate, st.schoolSearch.startDate))
+          addExp('School Search', st.schoolSearch.endDate, st.schoolSearch.startDate)
         if (st.aadharCard?.expiryDate && exportServices.includes('aadharCard'))
-          exp.push(formatExp('Aadhar Expiry', st.aadharCard.expiryDate))
+          addExp('Aadhar Expiry', st.aadharCard.expiryDate)
         if (st.departure?.propertyClosureDate && exportServices.includes('departure'))
-          exp.push(formatExp('Closure', st.departure.propertyClosureDate))
+          addExp('Closure', st.departure.propertyClosureDate)
 
-        return exp.filter(Boolean)
+        return results
       }
 
       if (role === 'HR') {
@@ -300,7 +301,9 @@ const CaseAnalytics = () => {
           'Employer',
           'Relocation Type',
           'Service Authorization',
-          'Start & Expiry Dates',
+          'Tracked Service',
+          'Service Start Date',
+          'Service Expiry Date',
           'Host Phone Number',
         ])
 
@@ -310,7 +313,10 @@ const CaseAnalytics = () => {
             .map((s) => s.label)
             .join('\n')
 
-          const expiries = getExpiriesList(c.serviceTracking || {})
+          const expDetailed = getExpiriesDetailed(c.serviceTracking || {})
+          const svcLabels = expDetailed.map((e) => e.label).join('\n')
+          const svcStarts = expDetailed.map((e) => e.start).join('\n')
+          const svcEnds = expDetailed.map((e) => e.end).join('\n')
 
           rows.push([
             c.assigneeName || 'N/A',
@@ -321,7 +327,9 @@ const CaseAnalytics = () => {
             c.employer || 'N/A',
             c.relocationType || 'N/A',
             authStr || 'N/A',
-            expiries.length > 0 ? expiries.join('\n') : 'N/A',
+            svcLabels || 'N/A',
+            svcStarts || 'N/A',
+            svcEnds || 'N/A',
             c.hostPhoneNumber || 'N/A',
           ])
         })
@@ -337,7 +345,9 @@ const CaseAnalytics = () => {
           'Status',
           'Case Manager',
           'Service Authorization',
-          'Start & Expiry Dates',
+          'Tracked Service',
+          'Service Start Date',
+          'Service Expiry Date',
           'Host Phone Number',
         ])
 
@@ -347,7 +357,10 @@ const CaseAnalytics = () => {
             .map((s) => s.label)
             .join('\n')
 
-          const expiries = getExpiriesList(c.serviceTracking || {})
+          const expDetailed = getExpiriesDetailed(c.serviceTracking || {})
+          const svcLabels = expDetailed.map((e) => e.label).join('\n')
+          const svcStarts = expDetailed.map((e) => e.start).join('\n')
+          const svcEnds = expDetailed.map((e) => e.end).join('\n')
 
           rows.push([
             c.assigneeName || 'N/A',
@@ -360,7 +373,9 @@ const CaseAnalytics = () => {
             c.status || 'N/A',
             c.assignedCaseManager?.username || 'Unassigned',
             authStr || 'N/A',
-            expiries.length > 0 ? expiries.join('\n') : 'N/A',
+            svcLabels || 'N/A',
+            svcStarts || 'N/A',
+            svcEnds || 'N/A',
             c.hostPhoneNumber || 'N/A',
           ])
         })
