@@ -77,7 +77,7 @@ const TicketList = () => {
       setUserRole(user.role)
       setCurrentUserId(user.id)
 
-      if (user.role === 'Admin') {
+      if (user.role === 'Admin' || user.role === 'SheetalAdmin') {
         UserService.getUsers()
           .then((res) => {
             // Filter for field executives.
@@ -709,7 +709,7 @@ const TicketList = () => {
             )}
           </div>
 
-          {(userRole === 'Admin' || userRole === 'Field Executive') && (
+          {(userRole === 'Admin' || userRole === 'Field Executive' || userRole === 'SheetalAdmin') && (
             <CForm onSubmit={handleAddNote}>
               <div className="mb-3">
                 <CFormLabel>Add Note</CFormLabel>

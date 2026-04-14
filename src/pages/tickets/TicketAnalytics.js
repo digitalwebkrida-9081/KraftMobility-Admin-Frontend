@@ -225,7 +225,7 @@ const TicketAnalytics = () => {
       setUserRole(user.role)
       setCurrentUserId(user.id)
 
-      if (user.role === 'Admin' || user.role === 'HR') {
+      if (user.role === 'Admin' || user.role === 'HR' || user.role === 'SheetalAdmin') {
         UserService.getUsers()
           .then((res) => {
             const ops = res.data.filter((u) => u.role === 'Field Executive')

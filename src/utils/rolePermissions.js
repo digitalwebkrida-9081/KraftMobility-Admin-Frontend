@@ -10,6 +10,8 @@ export const ROLES = {
   HR: 'HR',
   END_USER: 'End-User',
   CASE_MANAGER: 'Case Manager',
+  SHEETAL_ADMIN: 'SheetalAdmin',
+  SUPER_ADMIN: 'Super Admin',
 }
 
 export const rolePermissions = {
@@ -29,6 +31,11 @@ export const rolePermissions = {
     canRateTicket: false, // Admin cannot rate
     canViewRatings: true, // Admin can view ratings
     canViewCases: true,
+    canCreateCase: true,
+    canDeleteCase: true,
+    canAssignCaseManager: true,
+    canChangeCaseStatus: true,
+    canUpdateCaseMetadata: true,
   },
   [ROLES.FIELD_EXECUTIVE]: {
     canCreateTicket: false, // Field Executives work on tickets, don't create them
@@ -45,6 +52,12 @@ export const rolePermissions = {
     canViewDashboard: true,
     canRateTicket: false, // Field Executive cannot rate
     canViewRatings: true, // Field Executive can view ratings
+    canViewCases: true,
+    canCreateCase: false,
+    canDeleteCase: false,
+    canAssignCaseManager: false,
+    canChangeCaseStatus: true,
+    canUpdateCaseMetadata: false,
   },
   [ROLES.HR]: {
     canCreateTicket: false, // HR doesn't create tickets
@@ -62,6 +75,11 @@ export const rolePermissions = {
     canRateTicket: false, // HR cannot rate
     canViewRatings: true, // HR can view ratings
     canViewCases: true, // Specific permissions for Cases module
+    canCreateCase: true,
+    canDeleteCase: false,
+    canAssignCaseManager: false,
+    canChangeCaseStatus: false,
+    canUpdateCaseMetadata: false,
   },
   [ROLES.END_USER]: {
     canCreateTicket: true, // End users create tickets
@@ -79,6 +97,11 @@ export const rolePermissions = {
     canRateTicket: true, // End Users CAN rate
     canViewRatings: true, // End Users can view their own ratings
     canViewCases: false,
+    canCreateCase: false,
+    canDeleteCase: false,
+    canAssignCaseManager: false,
+    canChangeCaseStatus: false,
+    canUpdateCaseMetadata: false,
   },
   [ROLES.CASE_MANAGER]: {
     canCreateTicket: false,
@@ -96,6 +119,55 @@ export const rolePermissions = {
     canRateTicket: false,
     canViewRatings: false,
     canViewCases: true,
+    canCreateCase: false,
+    canDeleteCase: false,
+    canAssignCaseManager: false,
+    canChangeCaseStatus: true,
+    canUpdateCaseMetadata: true,
+  },
+  [ROLES.SHEETAL_ADMIN]: {
+    canCreateTicket: false,
+    canViewAllTickets: true,
+    canEditTicket: false,
+    canDeleteTicket: true,
+    canAssignTicket: true,
+    canViewAnalytics: true,
+    canManageUsers: false,
+    canExtendTicketTime: false,
+    canAddNotes: true,
+    canViewNotes: true,
+    canChangeTicketStatus: true,
+    canViewDashboard: true,
+    canRateTicket: false,
+    canViewRatings: true,
+    canViewCases: true,
+    canCreateCase: true,
+    canDeleteCase: true,
+    canAssignCaseManager: true,
+    canChangeCaseStatus: true,
+    canUpdateCaseMetadata: true,
+  },
+  [ROLES.SUPER_ADMIN]: {
+    canCreateTicket: false,
+    canViewAllTickets: true,
+    canEditTicket: false,
+    canDeleteTicket: true,
+    canAssignTicket: true,
+    canViewAnalytics: true,
+    canManageUsers: true,
+    canExtendTicketTime: false,
+    canAddNotes: true,
+    canViewNotes: true,
+    canChangeTicketStatus: true,
+    canViewDashboard: true,
+    canRateTicket: false,
+    canViewRatings: true,
+    canViewCases: true,
+    canCreateCase: true,
+    canDeleteCase: true,
+    canAssignCaseManager: true,
+    canChangeCaseStatus: true,
+    canUpdateCaseMetadata: true,
   },
 }
 

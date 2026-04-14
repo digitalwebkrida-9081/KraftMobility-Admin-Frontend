@@ -40,6 +40,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
+import { hasPermission } from '../../utils/rolePermissions'
 
 const MySwal = withReactContent(Swal)
 
@@ -204,18 +205,20 @@ const CaseList = () => {
     }
   }
 
-  // Get user role logic (simplified)
+  // Get user role logic
   const userStr = localStorage.getItem('user')
-  let isHR = false
-  let isAdmin = false
+  let userRole = ''
   if (userStr) {
     try {
       const parsedUser = JSON.parse(userStr)
       const user = parsedUser?.user || parsedUser
-      isHR = user?.role === 'HR'
-      isAdmin = user?.role === 'Admin'
+      userRole = user?.role || ''
     } catch (e) {}
   }
+  
+  const canCreateCase = hasPermission(userRole, 'canCreateCase')
+  const canDeleteCase = hasPermission(userRole, 'canDeleteCase')
+  const canViewCaseAnalytics = hasPermission(userRole, 'canViewAnalytics') // using existing map
 
   return (
     <CRow>
@@ -253,7 +256,7 @@ const CaseList = () => {
                 <CIcon icon={cilChartPie} className="me-1" />
                 Analytics Dashboard
               </CButton>
-              {isAdmin && selectedCases.length > 0 && (
+              {canDeleteCase && selectedCases.length > 0 && (
                 <CButton
                   color="danger"
                   size="sm"
@@ -264,7 +267,7 @@ const CaseList = () => {
                   Bulk Delete ({selectedCases.length})
                 </CButton>
               )}
-              {isHR || isAdmin ? (
+              {canCreateCase ? (
                 <CButton
                   color="primary"
                   size="sm"
@@ -317,7 +320,7 @@ const CaseList = () => {
                     <CTable hover responsive align="middle">
                       <CTableHead color="light">
                         <CTableRow>
-                          {isAdmin && (
+                          {canDeleteCase && (
                             <CTableHeaderCell style={{ width: '40px' }}>
                               <input
                                 type="checkbox"
@@ -345,7 +348,7 @@ const CaseList = () => {
                       <CTableBody>
                         {paginatedCases.map((caseItem) => (
                           <CTableRow key={caseItem.id}>
-                            {isAdmin && (
+                            {canDeleteCase && (
                               <CTableDataCell>
                                 <input
                                   type="checkbox"
@@ -415,7 +418,7 @@ const CaseList = () => {
                                     <CIcon icon={cilHistory} />
                                   </CButton>
                                 </CTooltip>
-                                {isAdmin && (
+                                {canDeleteCase && (
                                   <CTooltip content="Delete Case">
                                     <CButton
                                       color="danger"

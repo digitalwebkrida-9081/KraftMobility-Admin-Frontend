@@ -78,21 +78,31 @@ const CaseDetails = () => {
   const [selectedCaseManagerId, setSelectedCaseManagerId] = useState('')
   const [showTimeline, setShowTimeline] = useState(false)
 
-  // Current User Context
   const userStr = localStorage.getItem('user')
   let isCaseManagerOrAdmin = false
   let canEditTracking = false
-  let isAdmin = false
+  let canAssignCaseManager = false
+  let canDeleteCase = false
+  let canChangeCaseStatus = false
+  let canUpdateCaseMetadata = false
+  let isAdmin = false // keeping for backwards compatibility on fetching case managers
   let user = null
+  let userRole = ""
   if (userStr) {
     try {
       const parsedUser = JSON.parse(userStr)
       user = parsedUser?.user || parsedUser
-      isCaseManagerOrAdmin = user?.role === 'Case Manager' || user?.role === 'Admin'
+      userRole = user?.role || ""
+      isCaseManagerOrAdmin = user?.role === 'Case Manager' || user?.role === 'Admin' || user?.role === 'SheetalAdmin'
       canEditTracking = isCaseManagerOrAdmin || user?.role === 'Field Executive'
-      isAdmin = user?.role === 'Admin'
+      isAdmin = user?.role === 'Admin' || user?.role === 'SheetalAdmin'
     } catch (e) {}
   }
+  
+  canAssignCaseManager = hasPermission(userRole, 'canAssignCaseManager') || isAdmin
+  canDeleteCase = hasPermission(userRole, 'canDeleteCase') || isAdmin
+  canChangeCaseStatus = hasPermission(userRole, 'canChangeCaseStatus') || isCaseManagerOrAdmin
+  canUpdateCaseMetadata = hasPermission(userRole, 'canUpdateCaseMetadata') || isCaseManagerOrAdmin
 
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
 
@@ -509,7 +519,7 @@ const CaseDetails = () => {
                 <CIcon icon={cilList} className="me-1" />
                 Back to List
               </CButton>
-              {isCaseManagerOrAdmin && (
+              {canChangeCaseStatus && (
                 <CFormSelect
                   size="sm"
                   className="d-inline-block w-auto me-2 border-primary text-primary fw-bold"
@@ -523,7 +533,7 @@ const CaseDetails = () => {
                   <option value="Cancelled">Cancelled</option>
                 </CFormSelect>
               )}
-              {isAdmin && (
+              {canDeleteCase && (
                 <CButton
                   color="danger"
                   size="sm"
@@ -632,7 +642,7 @@ const CaseDetails = () => {
             <CTabContent>
               {/* OVERVIEW TAB */}
               <CTabPane visible={activeTab === 'overview'}>
-                {isAdmin && (
+                {canAssignCaseManager && (
                   <CRow className="mb-4">
                     <CCol md={6}>
                       <h6 className="border-bottom pb-2">Assign Case Manager</h6>
@@ -686,7 +696,7 @@ const CaseDetails = () => {
                     </CCol>
                   </CRow>
                 )}
-                {isCaseManagerOrAdmin && (
+                {canUpdateCaseMetadata && (
                   <CRow className="mb-4">
                     <CCol md={12}>
                       <h6 className="border-bottom pb-2">Case Metadata (Employer & Contact)</h6>

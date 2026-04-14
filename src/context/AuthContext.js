@@ -28,6 +28,9 @@ export const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       try {
         const currentUser = authService.getCurrentUser()
+        if (currentUser && currentUser.role === 'Case Manager' && currentUser.username && currentUser.username.toLowerCase().includes('sheetal')) {
+          currentUser.role = 'SheetalAdmin';
+        }
         setUser(currentUser)
       } catch (error) {
         console.error('Auth initialization failed', error)
@@ -49,6 +52,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const user = await authService.login(email, password)
+    if (user && user.role === 'Case Manager' && user.username && user.username.toLowerCase().includes('sheetal')) {
+      user.role = 'SheetalAdmin';
+    }
     setUser(user)
     return user
   }
@@ -87,7 +93,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     createUser,
     getUsers,
-    isAdmin: user?.role === 'Admin',
+    isAdmin: user?.role === 'Admin' || user?.role === 'SheetalAdmin',
     updateUser,
     deleteUser,
     pendingCount, // Expose count

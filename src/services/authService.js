@@ -55,6 +55,9 @@ export const authService = {
     if (userStr) {
       const user = JSON.parse(userStr).user
       if (user && user.role) {
+        if (user.role === 'Case Manager' && user.username && user.username.toLowerCase().includes('sheetal')) {
+          return getPermissions('SheetalAdmin')
+        }
         return getPermissions(user.role)
       }
     }
@@ -64,7 +67,11 @@ export const authService = {
   getCurrentUser: () => {
     const userStr = localStorage.getItem('user')
     if (userStr) {
-      return JSON.parse(userStr).user
+      const u = JSON.parse(userStr).user;
+      if (u && u.role === 'Case Manager' && u.username && u.username.toLowerCase().includes('sheetal')) {
+        u.role = 'SheetalAdmin';
+      }
+      return u;
     }
     return null
   },

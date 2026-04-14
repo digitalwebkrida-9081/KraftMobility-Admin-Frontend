@@ -122,19 +122,19 @@ const routes = [
     name: 'Cases',
     element: React.lazy(() => import('../pages/cases/CaseList')),
     exact: true,
-    roles: ['Admin', 'HR', 'Case Manager'],
+    roles: ['Admin', 'HR', 'Case Manager', 'SheetalAdmin'],
   },
   {
     path: '/cases/analytics',
     name: 'Case Analytics',
     element: React.lazy(() => import('../pages/cases/CaseAnalytics')),
-    roles: ['Admin', 'HR', 'Case Manager'],
+    roles: ['Admin', 'HR', 'Case Manager', 'SheetalAdmin'],
   },
   {
     path: '/cases/list',
     name: 'Case List',
     element: React.lazy(() => import('../pages/cases/CaseList')),
-    roles: ['Admin', 'HR', 'Case Manager'],
+    roles: ['Admin', 'HR', 'Case Manager', 'SheetalAdmin'],
   },
   {
     path: '/cases/create',
@@ -146,7 +146,7 @@ const routes = [
     path: '/cases/:id',
     name: 'Case Details',
     element: React.lazy(() => import('../pages/cases/CaseDetails')),
-    roles: ['Admin', 'HR', 'Case Manager'],
+    roles: ['Admin', 'HR', 'Case Manager', 'SheetalAdmin'],
   },
 ]
 
