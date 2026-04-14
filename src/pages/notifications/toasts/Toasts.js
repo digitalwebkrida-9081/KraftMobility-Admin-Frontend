@@ -8,7 +8,7 @@ import {
   CCol,
   CToast,
   CToastBody,
-  CClose,
+  CToastClose,
   CToastHeader,
   CToaster,
 } from '@coreui/react'

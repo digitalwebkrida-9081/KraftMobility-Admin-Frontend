@@ -180,7 +180,7 @@ const Dashboard = () => {
 
   return (
     <>
-      {user?.role === 'Admin' && <WidgetsDropdown className="mb-4" />}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && <WidgetsDropdown className="mb-4" />}
 
       {/* <CCard className="mb-4">
         <CCardBody>

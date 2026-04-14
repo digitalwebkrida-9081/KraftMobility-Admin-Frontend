@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
     // Only Admin needs this
     // We check authService.getCurrentUser() because 'user' state might lag slightly or be null initially
     const currentUser = authService.getCurrentUser() || user
-    if (currentUser?.role === 'Admin') {
+    if (currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin') {
       try {
         const response = await UserService.getPendingCount()
         setPendingCount(response.data.count)
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
   // Poll for pending count if user is admin
   useEffect(() => {
-    if (user?.role === 'Admin') {
+    if (user?.role === 'Admin' || user?.role === 'Super Admin') {
       fetchPendingCount()
       const interval = setInterval(fetchPendingCount, 15000) // Poll every 15s
       return () => clearInterval(interval)
@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     createUser,
     getUsers,
-    isAdmin: user?.role === 'Admin' || user?.role === 'SheetalAdmin',
+    isAdmin: user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'SheetalAdmin',
     updateUser,
     deleteUser,
     pendingCount, // Expose count

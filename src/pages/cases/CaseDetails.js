@@ -36,6 +36,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
+import { hasPermission as checkPermission } from 'src/utils/rolePermissions'
 
 const MySwal = withReactContent(Swal)
 
@@ -99,10 +100,10 @@ const CaseDetails = () => {
     } catch (e) {}
   }
   
-  canAssignCaseManager = hasPermission(userRole, 'canAssignCaseManager') || isAdmin
-  canDeleteCase = hasPermission(userRole, 'canDeleteCase') || isAdmin
-  canChangeCaseStatus = hasPermission(userRole, 'canChangeCaseStatus') || isCaseManagerOrAdmin
-  canUpdateCaseMetadata = hasPermission(userRole, 'canUpdateCaseMetadata') || isCaseManagerOrAdmin
+  canAssignCaseManager = checkPermission(userRole, 'canAssignCaseManager') || isAdmin
+  canDeleteCase = checkPermission(userRole, 'canDeleteCase') || isAdmin
+  canChangeCaseStatus = checkPermission(userRole, 'canChangeCaseStatus') || isCaseManagerOrAdmin
+  canUpdateCaseMetadata = checkPermission(userRole, 'canUpdateCaseMetadata') || isCaseManagerOrAdmin
 
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
 

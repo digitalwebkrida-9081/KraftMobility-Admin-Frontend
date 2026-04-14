@@ -174,14 +174,14 @@ export const rolePermissions = {
 /**
  * Get permissions for a specific role
  */
-export const getPermissions = (role) => {
+export function getPermissions(role) {
   return rolePermissions[role] || rolePermissions[ROLES.END_USER]
 }
 
 /**
  * Check if a role has a specific permission
  */
-export const hasPermission = (role, permission) => {
+export function hasPermission(role, permission) {
   const permissions = getPermissions(role)
   return permissions[permission] || false
 }

@@ -33,7 +33,7 @@ const AppSidebar = () => {
   // Get filtered navigation based on user role
   const baseNavItems = user?.role ? getFilteredNav(user.role) : []
   const navItems = [...baseNavItems]
-  if (user?.role === 'Admin') {
+  if (user?.role === 'Admin' || user?.role === 'Super Admin') {
     // Check if added to avoid duplicates if re-rendering (though clone prevents it, good to be safe id strict mode)
     if (!navItems.find((item) => item.name === 'Users')) {
       navItems.splice(1, 0, {
