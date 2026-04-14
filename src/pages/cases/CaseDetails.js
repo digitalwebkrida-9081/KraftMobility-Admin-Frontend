@@ -37,6 +37,7 @@ import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
 import { hasPermission as checkPermission } from 'src/utils/rolePermissions'
+import { authService } from 'src/services/authService'
 
 const MySwal = withReactContent(Swal)
 
@@ -79,31 +80,16 @@ const CaseDetails = () => {
   const [selectedCaseManagerId, setSelectedCaseManagerId] = useState('')
   const [showTimeline, setShowTimeline] = useState(false)
 
-  const userStr = localStorage.getItem('user')
-  let isCaseManagerOrAdmin = false
-  let canEditTracking = false
-  let canAssignCaseManager = false
-  let canDeleteCase = false
-  let canChangeCaseStatus = false
-  let canUpdateCaseMetadata = false
-  let isAdmin = false // keeping for backwards compatibility on fetching case managers
-  let user = null
-  let userRole = ""
-  if (userStr) {
-    try {
-      const parsedUser = JSON.parse(userStr)
-      user = parsedUser?.user || parsedUser
-      userRole = user?.role || ""
-      isCaseManagerOrAdmin = user?.role === 'Case Manager' || user?.role === 'Admin' || user?.role === 'SheetalAdmin'
-      canEditTracking = isCaseManagerOrAdmin || user?.role === 'Field Executive'
-      isAdmin = user?.role === 'Admin' || user?.role === 'SheetalAdmin'
-    } catch (e) {}
-  }
+  const user = authService.getCurrentUser()
+  const userRole = user?.role || ""
+  const isCaseManagerOrAdmin = userRole === 'Case Manager' || userRole === 'Admin' || userRole === 'SheetalAdmin' || userRole === 'Super Admin'
+  const canEditTracking = isCaseManagerOrAdmin || userRole === 'Field Executive'
+  const isAdmin = userRole === 'Admin' || userRole === 'SheetalAdmin' || userRole === 'Super Admin'
   
-  canAssignCaseManager = checkPermission(userRole, 'canAssignCaseManager') || isAdmin
-  canDeleteCase = checkPermission(userRole, 'canDeleteCase') || isAdmin
-  canChangeCaseStatus = checkPermission(userRole, 'canChangeCaseStatus') || isCaseManagerOrAdmin
-  canUpdateCaseMetadata = checkPermission(userRole, 'canUpdateCaseMetadata') || isCaseManagerOrAdmin
+  const canAssignCaseManager = checkPermission(userRole, 'canAssignCaseManager') || isAdmin
+  const canDeleteCase = checkPermission(userRole, 'canDeleteCase') || isAdmin
+  const canChangeCaseStatus = checkPermission(userRole, 'canChangeCaseStatus') || isCaseManagerOrAdmin
+  const canUpdateCaseMetadata = checkPermission(userRole, 'canUpdateCaseMetadata') || isCaseManagerOrAdmin
 
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
 

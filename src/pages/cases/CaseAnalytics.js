@@ -171,6 +171,7 @@ const CaseAnalytics = () => {
 
   const user = authService.getCurrentUser()
   const role = user?.role || ''
+  const isAdminRole = role === 'Admin' || role === 'Super Admin' || role === 'SheetalAdmin'
 
   useEffect(() => {
     fetchAnalytics()
@@ -248,7 +249,7 @@ const CaseAnalytics = () => {
 
       const rows = []
 
-      const reportTitle = `Dashboard report of ${role === 'Admin' ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
+      const reportTitle = `Dashboard report of ${isAdminRole ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
       rows.push([reportTitle])
       rows.push([]) // empty row spacer
 
@@ -506,7 +507,7 @@ const CaseAnalytics = () => {
 
   /* ── Role-specific title ── */
   const dashTitle =
-    role === 'Admin'
+    isAdminRole
       ? 'Admin Analytics Overview'
       : role === 'HR'
         ? 'My Cases Analytics'
@@ -579,13 +580,13 @@ const CaseAnalytics = () => {
           </CCol>
           <CCol sm={6} lg={3}>
             <StatCard
-              title={role === 'Admin' ? 'Unassigned' : 'Deadlines'}
-              value={role === 'Admin' ? s.unassignedCount : (data.upcomingDeadlines || []).length}
+              title={isAdminRole ? 'Unassigned' : 'Deadlines'}
+              value={isAdminRole ? s.unassignedCount : (data.upcomingDeadlines || []).length}
               icon={cilWarning}
-              gradient={`linear-gradient(135deg,${(role === 'Admin' ? s.unassignedCount : (data.upcomingDeadlines || []).length) > 0 ? '#ef4444,#dc2626' : '#64748b,#475569'})`}
-              subtitle={role === 'Admin' ? 'Need assignment' : 'Next 30 days'}
+              gradient={`linear-gradient(135deg,${(isAdminRole ? s.unassignedCount : (data.upcomingDeadlines || []).length) > 0 ? '#ef4444,#dc2626' : '#64748b,#475569'})`}
+              subtitle={isAdminRole ? 'Need assignment' : 'Next 30 days'}
               onClick={() =>
-                role === 'Admin' ? navigate('/cases?assigned=unassigned') : setActiveTab('dates')
+                isAdminRole ? navigate('/cases?assigned=unassigned') : setActiveTab('dates')
               }
             />
           </CCol>
@@ -595,7 +596,7 @@ const CaseAnalytics = () => {
         <CCard className="border-0 shadow-sm" style={{ borderRadius: '16px' }}>
           <CCardBody>
             <CNav variant="pills" className="mb-4">
-              {['overview', 'services', 'dates', ...(role === 'Admin' ? ['workload'] : [])].map(
+              {['overview', 'services', 'dates', ...(isAdminRole ? ['workload'] : [])].map(
                 (tab) => (
                   <CNavItem key={tab}>
                     <CNavLink
@@ -1315,7 +1316,7 @@ const CaseAnalytics = () => {
               </CTabPane>
 
               {/* ── WORKLOAD TAB (Admin only) ── */}
-              {role === 'Admin' && (
+              {isAdminRole && (
                 <CTabPane visible={activeTab === 'workload'}>
                   <CRow className="g-4">
                     <CCol md={8}>

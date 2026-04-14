@@ -41,6 +41,7 @@ import { toast } from 'react-toastify'
 import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
 import { hasPermission } from '../../utils/rolePermissions'
+import { authService } from 'src/services/authService'
 
 const MySwal = withReactContent(Swal)
 
@@ -205,16 +206,8 @@ const CaseList = () => {
     }
   }
 
-  // Get user role logic
-  const userStr = localStorage.getItem('user')
-  let userRole = ''
-  if (userStr) {
-    try {
-      const parsedUser = JSON.parse(userStr)
-      const user = parsedUser?.user || parsedUser
-      userRole = user?.role || ''
-    } catch (e) {}
-  }
+  const user = authService.getCurrentUser()
+  const userRole = user?.role || ""
   
   const canCreateCase = hasPermission(userRole, 'canCreateCase')
   const canDeleteCase = hasPermission(userRole, 'canDeleteCase')

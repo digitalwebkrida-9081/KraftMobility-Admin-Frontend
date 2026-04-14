@@ -20,6 +20,7 @@ import {
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { authService } from 'src/services/authService'
 
 const COUNTRY_LIST = [
   'Afghanistan',
@@ -324,14 +325,8 @@ const CreateCase = () => {
   const loading = useSelector((state) => state.loading)
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
 
-  const userStr = localStorage.getItem('user')
-  let userRole = ''
-  if (userStr) {
-    try {
-      const parsedUser = JSON.parse(userStr)
-      userRole = (parsedUser?.user || parsedUser)?.role || ''
-    } catch (e) {}
-  }
+  const user = authService.getCurrentUser()
+  const userRole = user?.role || ""
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
