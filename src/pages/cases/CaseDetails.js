@@ -365,6 +365,39 @@ const CaseDetails = () => {
     })
   }
 
+  const handleDeleteDocument = async (docId) => {
+    MySwal.fire({
+      title: 'Are you sure?',
+      text: "You want to delete this document? This cannot be undone.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ff0000',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          dispatch({ type: 'set_loading', loading: true })
+          const token = localStorage.getItem('user')
+            ? JSON.parse(localStorage.getItem('user')).token
+            : null
+          await axios.delete(`${BASE_API_URL}/cases/${id}/documents/${docId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+          toast.success('Document deleted successfully')
+          fetchCaseDetails()
+        } catch (error) {
+          console.error('Error deleting document:', error)
+          toast.error(error.response?.data?.message || 'Failed to delete document')
+        } finally {
+          dispatch({ type: 'set_loading', loading: false })
+        }
+      }
+    })
+  }
+
   if (!caseData && loading) {
     return (
       <div className="text-center py-5 mt-5">
@@ -1557,15 +1590,30 @@ const CaseDetails = () => {
                             {new Date(doc.uploadDate).toLocaleString()}
                           </div>
                         </div>
-                        <CButton
-                          color="info"
-                          variant="outline"
-                          size="sm"
-                          href={`${BASE_API_URL.replace('/api', '')}/${doc.path}`}
-                          target="_blank"
-                        >
-                          View/Download
-                        </CButton>
+                        <div className="d-flex gap-2">
+                          <CButton
+                            color="info"
+                            variant="outline"
+                            size="sm"
+                            href={`${BASE_API_URL.replace('/api', '')}/${doc.path}`}
+                            target="_blank"
+                            className="d-flex align-items-center"
+                          >
+                            View/Download
+                          </CButton>
+                          {canEditTracking && (
+                            <CButton
+                              color="danger"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteDocument(doc._id)}
+                              className="d-flex align-items-center"
+                              disabled={loading}
+                            >
+                              <CIcon icon={cilTrash} />
+                            </CButton>
+                          )}
+                        </div>
                       </CListGroupItem>
                     ))}
                   </CListGroup>
