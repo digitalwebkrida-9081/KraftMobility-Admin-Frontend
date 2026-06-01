@@ -206,6 +206,7 @@ const CaseAnalytics = () => {
     { key: 'departure', label: 'Departure' },
     { key: 'aadharCard', label: 'Aadhar Card' },
     { key: 'cForm', label: 'C-Form' },
+    { key: 'petShipment', label: 'Pet Shipment' },
     { key: 'other', label: 'Other' },
   ]
 

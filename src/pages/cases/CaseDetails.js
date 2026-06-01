@@ -30,7 +30,7 @@ import {
   CModalFooter,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilCheckCircle, cilHistory, cilTrash, cilList } from '@coreui/icons'
+import { cilCheckCircle, cilHistory, cilTrash, cilList, cilPencil } from '@coreui/icons'
 import axios from 'axios'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
@@ -90,6 +90,7 @@ const CaseDetails = () => {
   const canDeleteCase = checkPermission(userRole, 'canDeleteCase') || isAdmin
   const canChangeCaseStatus = checkPermission(userRole, 'canChangeCaseStatus') || isCaseManagerOrAdmin
   const canUpdateCaseMetadata = checkPermission(userRole, 'canUpdateCaseMetadata') || isCaseManagerOrAdmin
+  const canEditCase = checkPermission(userRole, 'canEditCase') || isAdmin
 
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
 
@@ -539,6 +540,18 @@ const CaseDetails = () => {
                 <CIcon icon={cilList} className="me-1" />
                 Back to List
               </CButton>
+              {canEditCase && (
+                <CButton
+                  color="warning"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(`/cases/edit/${id}`)}
+                  className="me-2 d-inline-flex align-items-center text-dark"
+                >
+                  <CIcon icon={cilPencil} className="me-1" />
+                  Edit Case
+                </CButton>
+              )}
               {canChangeCaseStatus && (
                 <CFormSelect
                   size="sm"
@@ -821,6 +834,12 @@ const CaseDetails = () => {
                             >
                               {caseData.relocationType || 'Not specified'}
                             </CBadge>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-muted">Assignment Start</td>
+                          <td>
+                            {caseData.assignmentStartDate ? new Date(caseData.assignmentStartDate).toLocaleDateString(undefined, { dateStyle: 'long' }) : '-'}
                           </td>
                         </tr>
                         <tr>

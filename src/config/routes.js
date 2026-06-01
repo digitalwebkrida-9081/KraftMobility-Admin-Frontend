@@ -143,6 +143,12 @@ const routes = [
     roles: ['Admin', 'Super Admin', 'HR'],
   },
   {
+    path: '/cases/edit/:id',
+    name: 'Edit Case',
+    element: React.lazy(() => import('../pages/cases/EditCase')),
+    roles: ['Admin', 'Super Admin', 'HR', 'SheetalAdmin'],
+  },
+  {
     path: '/cases/:id',
     name: 'Case Details',
     element: React.lazy(() => import('../pages/cases/CaseDetails')),

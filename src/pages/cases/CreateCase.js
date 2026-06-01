@@ -227,6 +227,7 @@ const CreateCase = () => {
   const [formData, setFormData] = useState({
     relocationId: '',
     assigneeName: '',
+    assignmentStartDate: '',
     billingEntity: '',
     employer: '',
     gender: '',
@@ -260,6 +261,7 @@ const CreateCase = () => {
       departure: false,
       aadharCard: false,
       cForm: false,
+      petShipment: false,
       other: false,
     },
     serviceTracking: {
@@ -317,16 +319,19 @@ const CreateCase = () => {
 
   const [currentStep, setCurrentStep] = useState(1)
   const [isManualEmployer, setIsManualEmployer] = useState(false)
-  const steps = ['Basics', 'Relocation', 'Family', 'Services', 'Tracking', 'Documents']
+  const user = authService.getCurrentUser()
+  const userRole = user?.role || ""
+  const baseSteps = formData.maritalStatus === 'Single'
+    ? ['Basics', 'Relocation', 'Services', 'Tracking', 'Documents']
+    : ['Basics', 'Relocation', 'Family', 'Services', 'Tracking', 'Documents']
+  const steps = userRole === 'HR' ? baseSteps.filter((s) => s !== 'Tracking') : baseSteps
+  const activeStepName = steps[currentStep - 1]
 
   const [generalDocuments, setGeneralDocuments] = useState([])
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const loading = useSelector((state) => state.loading)
   const BASE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5656/api'
-
-  const user = authService.getCurrentUser()
-  const userRole = user?.role || ""
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -553,7 +558,7 @@ const CreateCase = () => {
           <CCardBody className="p-4">
             <StatusStepper currentStep={currentStep} />
             <CForm onSubmit={(e) => e.preventDefault()}>
-              {currentStep === 1 && (
+              {activeStepName === 'Basics' && (
                 <div className="fade-in">
                   <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
                     Step 1: Assignee & Company Basics
@@ -625,16 +630,6 @@ const CreateCase = () => {
                       <CRow className="mb-3">
                         <CCol md={6}>
                           <CFormLabel className="small fw-bold text-muted">
-                            Billing Entity (Client Company)
-                          </CFormLabel>
-                          <CFormInput
-                            name="billingEntity"
-                            value={formData.billingEntity}
-                            onChange={handleInputChange}
-                          />
-                        </CCol>
-                        <CCol md={6}>
-                          <CFormLabel className="small fw-bold text-muted">
                             Employer Organization
                           </CFormLabel>
                           <div className="d-flex flex-column gap-2">
@@ -672,6 +667,16 @@ const CreateCase = () => {
                             )}
                           </div>
                         </CCol>
+                        <CCol md={6}>
+                          <CFormLabel className="small fw-bold text-muted">
+                            Billing Entity (Client Company)
+                          </CFormLabel>
+                          <CFormInput
+                            name="billingEntity"
+                            value={formData.billingEntity}
+                            onChange={handleInputChange}
+                          />
+                        </CCol>
                       </CRow>
                       <CRow className="mb-3">
                         <CCol md={4}>
@@ -708,7 +713,7 @@ const CreateCase = () => {
                 </div>
               )}
 
-              {currentStep === 2 && (
+              {activeStepName === 'Relocation' && (
                 <div className="fade-in">
                   <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
                     Step 2: Relocation Route & Contact
@@ -768,17 +773,26 @@ const CreateCase = () => {
                     )}
                   </CRow>
                   <CRow className="mb-3">
-                    <CCol md={6}>
-                      <CFormLabel className="small fw-bold text-muted">Source City</CFormLabel>
+                    <CCol md={4}>
+                      <CFormLabel className="small fw-bold text-muted">Origin City</CFormLabel>
                       <CFormInput
                         name="movingFromCity"
                         value={formData.movingFromCity}
                         onChange={handleInputChange}
                       />
                     </CCol>
-                    <CCol md={6}>
-                      <CFormLabel className="small fw-bold text-muted">Target City</CFormLabel>
+                    <CCol md={4}>
+                      <CFormLabel className="small fw-bold text-muted">Destination City</CFormLabel>
                       <CFormInput name="city" value={formData.city} onChange={handleInputChange} />
+                    </CCol>
+                    <CCol md={4}>
+                      <CFormLabel className="small fw-bold text-muted">Assignment Start Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        name="assignmentStartDate"
+                        value={formData.assignmentStartDate}
+                        onChange={handleInputChange}
+                      />
                     </CCol>
                   </CRow>
                   <CRow className="mb-3">
@@ -847,7 +861,7 @@ const CreateCase = () => {
                 </div>
               )}
 
-              {currentStep === 3 && (
+              {activeStepName === 'Family' && (
                 <div className="fade-in">
                   <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
                     Step 3: Spouse & Kids Detail
@@ -962,7 +976,7 @@ const CreateCase = () => {
                 </div>
               )}
 
-              {currentStep === 4 && (
+              {activeStepName === 'Services' && (
                 <div className="fade-in">
                   <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
                     Step 4: Scope of Authorized Services
@@ -973,7 +987,7 @@ const CreateCase = () => {
                       .filter(
                         (k) =>
                           formData.relocationType === 'International' ||
-                          ['homeSearch', 'schoolSearch', 'householdGoodsMovement'].includes(k),
+                          ['homeSearch', 'schoolSearch', 'householdGoodsMovement', 'petShipment'].includes(k),
                       )
                       .map((sk) => (
                         <CCol md={6} xl={4} key={sk} className="mb-3">
@@ -1070,7 +1084,7 @@ const CreateCase = () => {
                 </div>
               )}
 
-              {currentStep === 5 && (
+              {activeStepName === 'Tracking' && (
                 <div className="fade-in">
                   <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
                     Step 5: Initial Milestones & Tracking
@@ -1269,7 +1283,7 @@ const CreateCase = () => {
                 </div>
               )}
 
-              {currentStep === 6 && (
+              {activeStepName === 'Documents' && (
                 <div className="fade-in">
                   <h6 className="mb-4 border-bottom pb-2 fw-bold text-primary text-uppercase tracking-wider">
                     Step 6: Attached Documents & Remarks

@@ -36,6 +36,7 @@ export const rolePermissions = {
     canAssignCaseManager: true,
     canChangeCaseStatus: true,
     canUpdateCaseMetadata: true,
+    canEditCase: true,
   },
   [ROLES.FIELD_EXECUTIVE]: {
     canCreateTicket: false, // Field Executives work on tickets, don't create them
@@ -58,6 +59,7 @@ export const rolePermissions = {
     canAssignCaseManager: false,
     canChangeCaseStatus: true,
     canUpdateCaseMetadata: false,
+    canEditCase: false,
   },
   [ROLES.HR]: {
     canCreateTicket: false, // HR doesn't create tickets
@@ -80,6 +82,7 @@ export const rolePermissions = {
     canAssignCaseManager: false,
     canChangeCaseStatus: false,
     canUpdateCaseMetadata: false,
+    canEditCase: true,
   },
   [ROLES.END_USER]: {
     canCreateTicket: true, // End users create tickets
@@ -102,6 +105,7 @@ export const rolePermissions = {
     canAssignCaseManager: false,
     canChangeCaseStatus: false,
     canUpdateCaseMetadata: false,
+    canEditCase: false,
   },
   [ROLES.CASE_MANAGER]: {
     canCreateTicket: false,
@@ -124,6 +128,7 @@ export const rolePermissions = {
     canAssignCaseManager: false,
     canChangeCaseStatus: true,
     canUpdateCaseMetadata: true,
+    canEditCase: false,
   },
   [ROLES.SHEETAL_ADMIN]: {
     canCreateTicket: false,
@@ -146,6 +151,7 @@ export const rolePermissions = {
     canAssignCaseManager: true,
     canChangeCaseStatus: true,
     canUpdateCaseMetadata: true,
+    canEditCase: true,
   },
   [ROLES.SUPER_ADMIN]: {
     canCreateTicket: false,
@@ -168,6 +174,7 @@ export const rolePermissions = {
     canAssignCaseManager: true,
     canChangeCaseStatus: true,
     canUpdateCaseMetadata: true,
+    canEditCase: true,
   },
 }
 

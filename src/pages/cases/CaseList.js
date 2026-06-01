@@ -8,6 +8,7 @@ import {
   cilPlus,
   cilX,
   cilFilter,
+  cilPencil,
 } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import {
@@ -211,6 +212,7 @@ const CaseList = () => {
   
   const canCreateCase = hasPermission(userRole, 'canCreateCase')
   const canDeleteCase = hasPermission(userRole, 'canDeleteCase')
+  const canEditCase = hasPermission(userRole, 'canEditCase')
   const canViewCaseAnalytics = hasPermission(userRole, 'canViewAnalytics') // using existing map
 
   return (
@@ -398,6 +400,18 @@ const CaseList = () => {
                                     <CIcon icon={cilSearch} />
                                   </CButton>
                                 </CTooltip>
+                                {canEditCase && (
+                                  <CTooltip content="Edit Case">
+                                    <CButton
+                                      color="warning"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => navigate(`/cases/edit/${caseItem.id}`)}
+                                    >
+                                      <CIcon icon={cilPencil} />
+                                    </CButton>
+                                  </CTooltip>
+                                )}
                                 <CTooltip content="Case Timeline">
                                   <CButton
                                     color="secondary"
