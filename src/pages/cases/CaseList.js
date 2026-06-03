@@ -35,6 +35,9 @@ import {
   CPagination,
   CPaginationItem,
   CFormSelect,
+  CFormInput,
+  CInputGroup,
+  CInputGroupText,
 } from '@coreui/react'
 import axios from 'axios'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -57,6 +60,7 @@ const CaseList = () => {
   const [selectedTimelineCase, setSelectedTimelineCase] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const statusFilter = searchParams.get('status')
   const assignedFilter = searchParams.get('assigned')
@@ -94,6 +98,39 @@ const CaseList = () => {
   const filteredCases = cases.filter((c) => {
     if (statusFilter && c.status !== statusFilter) return false
     if (assignedFilter === 'unassigned' && c.assignedCaseManager) return false
+
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim()
+
+      const matchAssignee = c.assigneeName?.toLowerCase().includes(query)
+      const matchRelocationId = c.relocationId?.toLowerCase().includes(query)
+      const matchBilling = c.billingEntity?.toLowerCase().includes(query)
+      const matchEmployer = c.employer?.toLowerCase().includes(query)
+      const matchEmail = (c.officialEmailAddress?.toLowerCase().includes(query) || c.personalEmailAddress?.toLowerCase().includes(query))
+      const matchPhone = (c.mobileNumber?.toLowerCase().includes(query) || c.hostPhoneNumber?.toLowerCase().includes(query))
+      const matchStatus = c.status?.toLowerCase().includes(query)
+      const matchManager = c.assignedCaseManager?.username?.toLowerCase().includes(query)
+      const matchFrom = (c.movingFromCity?.toLowerCase().includes(query) || c.movingFromCountry?.toLowerCase().includes(query))
+      const matchTo = (c.city?.toLowerCase().includes(query) || c.movingToCountry?.toLowerCase().includes(query))
+      const matchEmpNo = c.empNumber?.toLowerCase().includes(query)
+
+      if (
+        !matchAssignee &&
+        !matchRelocationId &&
+        !matchBilling &&
+        !matchEmployer &&
+        !matchEmail &&
+        !matchPhone &&
+        !matchStatus &&
+        !matchManager &&
+        !matchFrom &&
+        !matchTo &&
+        !matchEmpNo
+      ) {
+        return false
+      }
+    }
+
     return true
   })
 
@@ -283,28 +320,68 @@ const CaseList = () => {
               </div>
             ) : (
               <>
-                <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
                   <div className="text-muted small">
-                    Showing {Math.min(filteredCases.length, (currentPage - 1) * pageSize + 1)} to{' '}
+                    Showing {filteredCases.length === 0 ? 0 : Math.min(filteredCases.length, (currentPage - 1) * pageSize + 1)} to{' '}
                     {Math.min(filteredCases.length, currentPage * pageSize)} of{' '}
                     {filteredCases.length} entries
                   </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="small text-muted">Show:</span>
-                    <CFormSelect
-                      size="sm"
-                      value={pageSize}
-                      onChange={(e) => {
-                        setPageSize(Number(e.target.value))
-                        setCurrentPage(1)
-                      }}
-                      style={{ width: '80px' }}
-                    >
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                      <option value="50">50</option>
-                      <option value="100">100</option>
-                    </CFormSelect>
+                  <div className="d-flex flex-wrap align-items-center gap-3">
+                    {/* Search Bar */}
+                    <CInputGroup size="sm" style={{ width: '300px' }}>
+                      <CInputGroupText className="bg-light border-end-0">
+                        <CIcon icon={cilSearch} />
+                      </CInputGroupText>
+                      <CFormInput
+                        placeholder="Search assignee, ID, billing..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="border-start-0 ps-0"
+                      />
+                      {searchQuery && (
+                        <CButton
+                          color="secondary"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSearchQuery('')
+                            setCurrentPage(1)
+                          }}
+                          style={{
+                            borderTop: '1px solid #ced4da',
+                            borderBottom: '1px solid #ced4da',
+                            borderRight: '1px solid #ced4da',
+                            borderLeft: 'none',
+                            borderRadius: '0 0.25rem 0.25rem 0',
+                            backgroundColor: '#fff',
+                            color: '#6c757d',
+                          }}
+                        >
+                          <CIcon icon={cilX} size="sm" />
+                        </CButton>
+                      )}
+                    </CInputGroup>
+
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="small text-muted">Show:</span>
+                      <CFormSelect
+                        size="sm"
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value))
+                          setCurrentPage(1)
+                        }}
+                        style={{ width: '80px' }}
+                      >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                      </CFormSelect>
+                    </div>
                   </div>
                 </div>
 
