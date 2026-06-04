@@ -162,6 +162,15 @@ const CaseAnalytics = () => {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportServices, setExportServices] = useState([])
 
+  // State variables for specialized report date filters
+  const [leaseFilterStart, setLeaseFilterStart] = useState('')
+  const [leaseFilterEnd, setLeaseFilterEnd] = useState('')
+  const [visaFilterStart, setVisaFilterStart] = useState('')
+  const [visaFilterEnd, setVisaFilterEnd] = useState('')
+  const [sortBy, setSortBy] = useState('default')
+  const [standardFilterStart, setStandardFilterStart] = useState('')
+  const [standardFilterEnd, setStandardFilterEnd] = useState('')
+
   // Pagination states
   const [expiryPage, setExpiryPage] = useState(1)
   const [trackingPage, setTrackingPage] = useState(1)
@@ -225,6 +234,58 @@ const CaseAnalytics = () => {
     else setExportServices([...exportServices, key])
   }
 
+  const sortCases = (casesList, reportType) => {
+    const listCopy = [...casesList]
+
+    listCopy.sort((a, b) => {
+      if (sortBy === 'nameAsc') {
+        const nameA = (a.assigneeName || '').trim().toLowerCase()
+        const nameB = (b.assigneeName || '').trim().toLowerCase()
+        return nameA.localeCompare(nameB)
+      }
+      if (sortBy === 'nameDesc') {
+        const nameA = (a.assigneeName || '').trim().toLowerCase()
+        const nameB = (b.assigneeName || '').trim().toLowerCase()
+        return nameB.localeCompare(nameA)
+      }
+
+      if (sortBy === 'dateAsc' || sortBy === 'dateDesc') {
+        let dateA, dateB
+
+        if (reportType === 'lease') {
+          dateA = a.serviceTracking?.homeSearch?.leaseStartDate
+            ? new Date(a.serviceTracking.homeSearch.leaseStartDate)
+            : null
+          dateB = b.serviceTracking?.homeSearch?.leaseStartDate
+            ? new Date(b.serviceTracking.homeSearch.leaseStartDate)
+            : null
+        } else if (reportType === 'visa') {
+          dateA = a.serviceTracking?.visa?.startDate
+            ? new Date(a.serviceTracking.visa.startDate)
+            : null
+          dateB = b.serviceTracking?.visa?.startDate
+            ? new Date(b.serviceTracking.visa.startDate)
+            : null
+        } else {
+          dateA = a.createdAt ? new Date(a.createdAt) : null
+          dateB = b.createdAt ? new Date(b.createdAt) : null
+        }
+
+        if (!dateA && !dateB) return 0
+        if (!dateA) return 1
+        if (!dateB) return -1
+
+        return sortBy === 'dateAsc' ? dateA - dateB : dateB - dateA
+      }
+
+      const dateA = a.createdAt ? new Date(a.createdAt) : 0
+      const dateB = b.createdAt ? new Date(b.createdAt) : 0
+      return dateB - dateA
+    })
+
+    return listCopy
+  }
+
   const generateReport = async () => {
     if (exportServices.length === 0) {
       toast.warning('Please select at least one service to export')
@@ -245,13 +306,36 @@ const CaseAnalytics = () => {
 
       const filteredCases = allCases.filter((c) => {
         const auth = c.servicesAuthorized || {}
-        return exportServices.some((sk) => auth[sk])
+        const matchesServices = exportServices.some((sk) => auth[sk])
+        if (!matchesServices) return false
+
+        const caseStart = c.createdAt ? new Date(c.createdAt).setHours(0, 0, 0, 0) : null
+
+        if (standardFilterStart) {
+          const fStart = new Date(standardFilterStart).setHours(0, 0, 0, 0)
+          if (!caseStart || caseStart < fStart) return false
+        }
+        if (standardFilterEnd) {
+          const fEnd = new Date(standardFilterEnd).setHours(23, 59, 59, 999)
+          if (!caseStart || caseStart > fEnd) return false
+        }
+
+        return true
       })
+
+      const sortedCases = sortCases(filteredCases, 'standard')
 
       const rows = []
 
       const reportTitle = `Dashboard report of ${isAdminRole ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
       rows.push([reportTitle])
+      if (standardFilterStart || standardFilterEnd) {
+        rows.push([
+          `Duration: ${standardFilterStart ? fmt(standardFilterStart) : 'Start'} to ${
+            standardFilterEnd ? fmt(standardFilterEnd) : 'End'
+          }`,
+        ])
+      }
       rows.push([]) // empty row spacer
 
       const getExpiriesDetailed = (st) => {
@@ -309,7 +393,7 @@ const CaseAnalytics = () => {
           'Host Phone Number',
         ])
 
-        filteredCases.forEach((c) => {
+        sortedCases.forEach((c) => {
           const auth = c.servicesAuthorized || {}
           const authStr = ALL_SERVICES.filter((s) => auth[s.key] && exportServices.includes(s.key))
             .map((s) => s.label)
@@ -353,7 +437,7 @@ const CaseAnalytics = () => {
           'Host Phone Number',
         ])
 
-        filteredCases.forEach((c) => {
+        sortedCases.forEach((c) => {
           const auth = c.servicesAuthorized || {}
           const authStr = ALL_SERVICES.filter((s) => auth[s.key] && exportServices.includes(s.key))
             .map((s) => s.label)
@@ -427,6 +511,295 @@ const CaseAnalytics = () => {
 
       XLSX.writeFile(wb, `Service_Report_${role}_${new Date().toISOString().split('T')[0]}.xlsx`)
       toast.success('Report downloaded successfully')
+      setShowExportModal(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Export failed')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
+    }
+  }
+
+  const generateLeaseReport = async () => {
+    try {
+      dispatch({ type: 'set_loading', loading: true })
+      const token = authService.getToken()
+
+      const res = await axios.get(`${BASE_API_URL}/cases`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const allCases = res.data
+
+      const filteredCases = allCases.filter((c) => {
+        // Must have personalLease or corporateLease or homeSearch authorized
+        const auth = c.servicesAuthorized || {}
+        if (!auth.personalLease && !auth.corporateLease && !auth.homeSearch) {
+          return false
+        }
+
+        const leaseStart = c.serviceTracking?.homeSearch?.leaseStartDate
+          ? new Date(c.serviceTracking.homeSearch.leaseStartDate).setHours(0, 0, 0, 0)
+          : null
+        const leaseEnd = c.serviceTracking?.homeSearch?.leaseEndDate
+          ? new Date(c.serviceTracking.homeSearch.leaseEndDate).setHours(0, 0, 0, 0)
+          : null
+
+        if (!leaseFilterStart && !leaseFilterEnd) {
+          return true
+        }
+
+        let startMatch = true
+        let endMatch = true
+
+        if (leaseFilterStart) {
+          const fStart = new Date(leaseFilterStart).setHours(0, 0, 0, 0)
+          if (!leaseStart || leaseStart < fStart) startMatch = false
+          if (!leaseEnd || leaseEnd < fStart) endMatch = false
+        }
+        if (leaseFilterEnd) {
+          const fEnd = new Date(leaseFilterEnd).setHours(23, 59, 59, 999)
+          if (!leaseStart || leaseStart > fEnd) startMatch = false
+          if (!leaseEnd || leaseEnd > fEnd) endMatch = false
+        }
+
+        return startMatch || endMatch
+      })
+
+      if (filteredCases.length === 0) {
+        toast.warning('No cases match the specified Lease date range')
+        return
+      }
+
+      const sortedCases = sortCases(filteredCases, 'lease')
+
+      const XLSX = await import('xlsx')
+      const wb = XLSX.utils.book_new()
+
+      const rows = []
+
+      const reportTitle = `Lease Service Report of ${isAdminRole ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
+      rows.push([reportTitle])
+      if (leaseFilterStart || leaseFilterEnd) {
+        rows.push([
+          `Duration: ${leaseFilterStart ? fmt(leaseFilterStart) : 'Start'} to ${
+            leaseFilterEnd ? fmt(leaseFilterEnd) : 'End'
+          }`,
+        ])
+      } else {
+        rows.push([`Duration: All Leases`])
+      }
+      rows.push([]) // empty row spacer
+
+      rows.push([
+        'Employee Name',
+        'Employee No.',
+        'Relocation ID',
+        'Case Start Date',
+        'Billing Entity',
+        'Employer',
+        'Relocation Type',
+        'Status',
+        'Case Manager',
+        'Property Address',
+        'Home Search Budget',
+        'Monthly Rent',
+        'Deposit',
+        'Lease Start Date',
+        'Lease End Date',
+        'Host Phone Number',
+      ])
+
+      sortedCases.forEach((c) => {
+        rows.push([
+          c.assigneeName || 'N/A',
+          c.empNumber || 'N/A',
+          c.relocationId || 'N/A',
+          fmt(c.createdAt),
+          c.billingEntity || 'N/A',
+          c.employer || 'N/A',
+          c.relocationType || 'N/A',
+          c.status || 'N/A',
+          c.assignedCaseManager?.username || 'Unassigned',
+          c.serviceTracking?.homeSearch?.propertyAddress || 'N/A',
+          c.homeSearchBudget || 'N/A',
+          c.serviceTracking?.homeSearch?.monthlyRent || 'N/A',
+          c.serviceTracking?.homeSearch?.deposit || 'N/A',
+          fmt(c.serviceTracking?.homeSearch?.leaseStartDate),
+          fmt(c.serviceTracking?.homeSearch?.leaseEndDate),
+          c.hostPhoneNumber || 'N/A',
+        ])
+      })
+
+      const ws = XLSX.utils.aoa_to_sheet(rows)
+
+      // Auto-set column widths for readability
+      const colWidths = []
+      rows[3]?.forEach((_, i) => {
+        let maxLen = 15
+        rows.forEach((row) => {
+          const val = row[i]?.toString() || ''
+          const lines = val.split('\n')
+          lines.forEach((line) => {
+            if (line.length > maxLen) maxLen = line.length
+          })
+        })
+        colWidths.push({ wch: Math.min(maxLen + 2, 50) })
+      })
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Lease Report')
+
+      XLSX.writeFile(wb, `Lease_Report_${new Date().toISOString().split('T')[0]}.xlsx`)
+      toast.success('Lease Report downloaded successfully')
+      setShowExportModal(false)
+    } catch (err) {
+      console.error(err)
+      toast.error('Export failed')
+    } finally {
+      dispatch({ type: 'set_loading', loading: false })
+    }
+  }
+
+  const generateVisaReport = async () => {
+    try {
+      dispatch({ type: 'set_loading', loading: true })
+      const token = authService.getToken()
+
+      const res = await axios.get(`${BASE_API_URL}/cases`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const allCases = res.data
+
+      const filteredCases = allCases.filter((c) => {
+        // Must have visaApplication authorized
+        const auth = c.servicesAuthorized || {}
+        if (!auth.visaApplication) {
+          return false
+        }
+
+        const visaStart = c.serviceTracking?.visa?.startDate
+          ? new Date(c.serviceTracking.visa.startDate).setHours(0, 0, 0, 0)
+          : null
+        const visaEnd = c.serviceTracking?.visa?.endDate
+          ? new Date(c.serviceTracking.visa.endDate).setHours(0, 0, 0, 0)
+          : null
+
+        if (!visaFilterStart && !visaFilterEnd) {
+          return true
+        }
+
+        let startMatch = true
+        let endMatch = true
+
+        if (visaFilterStart) {
+          const fStart = new Date(visaFilterStart).setHours(0, 0, 0, 0)
+          if (!visaStart || visaStart < fStart) startMatch = false
+          if (!visaEnd || visaEnd < fStart) endMatch = false
+        }
+        if (visaFilterEnd) {
+          const fEnd = new Date(visaFilterEnd).setHours(23, 59, 59, 999)
+          if (!visaStart || visaStart > fEnd) startMatch = false
+          if (!visaEnd || visaEnd > fEnd) endMatch = false
+        }
+
+        return startMatch || endMatch
+      })
+
+      if (filteredCases.length === 0) {
+        toast.warning('No cases match the specified Visa date range')
+        return
+      }
+
+      const sortedCases = sortCases(filteredCases, 'visa')
+
+      const XLSX = await import('xlsx')
+      const wb = XLSX.utils.book_new()
+
+      const rows = []
+
+      const reportTitle = `Visa Service Report of ${isAdminRole ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
+      rows.push([reportTitle])
+      if (visaFilterStart || visaFilterEnd) {
+        rows.push([
+          `Duration: ${visaFilterStart ? fmt(visaFilterStart) : 'Start'} to ${
+            visaFilterEnd ? fmt(visaFilterEnd) : 'End'
+          }`,
+        ])
+      } else {
+        rows.push([`Duration: All Visas`])
+      }
+      rows.push([]) // empty row spacer
+
+      rows.push([
+        'Employee Name',
+        'Employee No.',
+        'Relocation ID',
+        'Case Start Date',
+        'Billing Entity',
+        'Employer',
+        'Relocation Type',
+        'Status',
+        'Case Manager',
+        'Visa Type',
+        'Visa Start Date',
+        'Visa End Date',
+        'FRRO Start Date',
+        'FRRO End Date',
+        'Authorized Visa Details',
+        'Host Phone Number',
+      ])
+
+      sortedCases.forEach((c) => {
+        const vd = c.visaDetails || {}
+        const authVisaTypes = []
+        if (vd.businessVisa) authVisaTypes.push('Business Visa')
+        if (vd.employmentVisa) authVisaTypes.push('Employment Visa')
+        if (vd.touristVisa) authVisaTypes.push('Tourist Visa')
+        if (vd.frro) authVisaTypes.push('FRRO')
+        if (vd.visaExtension) authVisaTypes.push('Visa Extension')
+        const authVisaStr = authVisaTypes.join(', ') || 'N/A'
+
+        rows.push([
+          c.assigneeName || 'N/A',
+          c.empNumber || 'N/A',
+          c.relocationId || 'N/A',
+          fmt(c.createdAt),
+          c.billingEntity || 'N/A',
+          c.employer || 'N/A',
+          c.relocationType || 'N/A',
+          c.status || 'N/A',
+          c.assignedCaseManager?.username || 'Unassigned',
+          c.serviceTracking?.visa?.type || 'N/A',
+          fmt(c.serviceTracking?.visa?.startDate),
+          fmt(c.serviceTracking?.visa?.endDate),
+          fmt(c.serviceTracking?.visa?.frroStartDate),
+          fmt(c.serviceTracking?.visa?.frroEndDate),
+          authVisaStr,
+          c.hostPhoneNumber || 'N/A',
+        ])
+      })
+
+      const ws = XLSX.utils.aoa_to_sheet(rows)
+
+      // Auto-set column widths for readability
+      const colWidths = []
+      rows[3]?.forEach((_, i) => {
+        let maxLen = 15
+        rows.forEach((row) => {
+          const val = row[i]?.toString() || ''
+          const lines = val.split('\n')
+          lines.forEach((line) => {
+            if (line.length > maxLen) maxLen = line.length
+          })
+        })
+        colWidths.push({ wch: Math.min(maxLen + 2, 50) })
+      })
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Visa Report')
+
+      XLSX.writeFile(wb, `Visa_Report_${new Date().toISOString().split('T')[0]}.xlsx`)
+      toast.success('Visa Report downloaded successfully')
       setShowExportModal(false)
     } catch (err) {
       console.error(err)
@@ -1534,42 +1907,203 @@ const CaseAnalytics = () => {
         visible={showExportModal}
         onClose={() => setShowExportModal(false)}
         alignment="center"
+        size="lg"
       >
         <CModalHeader onClose={() => setShowExportModal(false)}>
-          <CModalTitle>Download Service Report</CModalTitle>
+          <CModalTitle className="fw-bold">Download Service Reports</CModalTitle>
         </CModalHeader>
-        <CModalBody>
-          <div className="mb-3 text-muted small">
-            Select the services you want to include in the report. Only cases matching these
-            services will be exported.
+        <CModalBody className="px-4 py-3">
+          {/* Report Sorting Panel */}
+          <div className="mb-4 p-3 rounded border-0" style={{ background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px' }}>
+            <div className="row align-items-center">
+              <div className="col-sm-5 col-md-4">
+                <span className="fw-bold text-dark small d-block">Report Sorting Preference</span>
+                <small className="text-muted d-block" style={{ fontSize: '11px' }}>
+                  Choose how cases are ordered in the Excel sheet.
+                </small>
+              </div>
+              <div className="col-sm-7 col-md-8 mt-2 mt-sm-0">
+                <CFormSelect
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                >
+                  <option value="default">Default (Creation Date - Newest First)</option>
+                  <option value="nameAsc">Employee Name (A to Z)</option>
+                  <option value="nameDesc">Employee Name (Z to A)</option>
+                  <option value="dateAsc">Date - Oldest First (Lease/Visa Start or Creation Date)</option>
+                  <option value="dateDesc">Date - Newest First (Lease/Visa Start or Creation Date)</option>
+                </CFormSelect>
+              </div>
+            </div>
           </div>
-          <div className="mb-3 p-2 bg-light rounded border">
-            <CFormCheck
-              id="selectAllServices"
-              label={<span className="fw-bold">Select All Services</span>}
-              checked={exportServices.length === ALL_SERVICES.length}
-              onChange={handleExportSelectAll}
-            />
-          </div>
-          <CRow className="g-2">
-            {ALL_SERVICES.map((svc) => (
-              <CCol xs={6} key={svc.key}>
-                <CFormCheck
-                  id={`export-${svc.key}`}
-                  label={svc.label}
-                  checked={exportServices.includes(svc.key)}
-                  onChange={() => handleExportCheckbox(svc.key)}
+
+          {/* Section 1: Standard Service Report */}
+          <div className="mb-4">
+            <h6 className="fw-bold text-primary mb-2">Standard Service Report</h6>
+            <div className="mb-3 text-muted small">
+              Select the services you want to include in the report. Only cases matching these
+              services will be exported.
+            </div>
+            <div className="mb-3 p-2 bg-light rounded border">
+              <CFormCheck
+                id="selectAllServices"
+                label={<span className="fw-bold">Select All Services</span>}
+                checked={exportServices.length === ALL_SERVICES.length}
+                onChange={handleExportSelectAll}
+              />
+            </div>
+            <CRow className="g-2 mb-3">
+              {ALL_SERVICES.map((svc) => (
+                <CCol xs={6} md={4} key={svc.key}>
+                  <CFormCheck
+                    id={`export-${svc.key}`}
+                    label={svc.label}
+                    checked={exportServices.includes(svc.key)}
+                    onChange={() => handleExportCheckbox(svc.key)}
+                  />
+                </CCol>
+              ))}
+            </CRow>
+            
+            {/* Standard Report Date Interval Filters */}
+            <CRow className="g-3 mb-3">
+              <CCol md={6}>
+                <label className="form-label small fw-semibold text-muted mb-1">Case Start Date (From)</label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  value={standardFilterStart}
+                  onChange={(e) => setStandardFilterStart(e.target.value)}
+                  style={{ borderRadius: '6px' }}
                 />
               </CCol>
-            ))}
+              <CCol md={6}>
+                <label className="form-label small fw-semibold text-muted mb-1">Case Start Date (To)</label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  value={standardFilterEnd}
+                  onChange={(e) => setStandardFilterEnd(e.target.value)}
+                  style={{ borderRadius: '6px' }}
+                />
+              </CCol>
+            </CRow>
+
+            <div className="d-flex justify-content-end">
+              <CButton color="primary" onClick={generateReport} disabled={exportServices.length === 0} style={{ borderRadius: '8px' }}>
+                <CIcon icon={cilCloudDownload} className="me-1" /> Download Standard Report
+              </CButton>
+            </div>
+          </div>
+
+          {/* Separator */}
+          <div className="my-4 d-flex align-items-center">
+            <div className="flex-grow-1 border-bottom" style={{ borderColor: '#e2e8f0' }}></div>
+            <span className="px-3 text-uppercase fw-bold text-muted small" style={{ letterSpacing: '1px', fontSize: '11px' }}>
+              Specialized Reports
+            </span>
+            <div className="flex-grow-1 border-bottom" style={{ borderColor: '#e2e8f0' }}></div>
+          </div>
+
+          {/* Section 2: Specialized Reports */}
+          <CRow className="g-4 mb-2">
+            {/* Lease Report */}
+            <CCol md={6}>
+              <div className="h-100 border rounded" style={{ background: '#f8fafc', overflow: 'hidden', borderColor: '#e2e8f0' }}>
+                <div className="p-3" style={{ background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)' }}>
+                  <h6 className="fw-bold mb-1 text-sky-900" style={{ fontSize: '15px' }}>Lease Duration Report</h6>
+                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>Export cases within a specific lease interval</small>
+                </div>
+                <div className="p-3">
+                  <div className="mb-2">
+                    <label className="form-label small fw-semibold text-muted mb-1">Lease Start Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      value={leaseFilterStart}
+                      onChange={(e) => setLeaseFilterStart(e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-semibold text-muted mb-1">Lease End Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      value={leaseFilterEnd}
+                      onChange={(e) => setLeaseFilterEnd(e.target.value)}
+                    />
+                  </div>
+                  <CButton
+                    color="info"
+                    size="sm"
+                    className="w-100 d-flex align-items-center justify-content-center gap-2 text-white"
+                    style={{
+                      background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                      border: 'none',
+                      transition: 'all 0.2s',
+                      borderRadius: '8px',
+                      padding: '8px',
+                      fontWeight: '600'
+                    }}
+                    onClick={generateLeaseReport}
+                  >
+                    <CIcon icon={cilCloudDownload} size="sm" /> Download Lease Report
+                  </CButton>
+                </div>
+              </div>
+            </CCol>
+
+            {/* Visa Report */}
+            <CCol md={6}>
+              <div className="h-100 border rounded" style={{ background: '#f8fafc', overflow: 'hidden', borderColor: '#e2e8f0' }}>
+                <div className="p-3" style={{ background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)' }}>
+                  <h6 className="fw-bold mb-1 text-emerald-900" style={{ fontSize: '15px' }}>Visa Validity Report</h6>
+                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>Export cases within a specific visa interval</small>
+                </div>
+                <div className="p-3">
+                  <div className="mb-2">
+                    <label className="form-label small fw-semibold text-muted mb-1">Visa Start Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      value={visaFilterStart}
+                      onChange={(e) => setVisaFilterStart(e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-semibold text-muted mb-1">Visa End Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      value={visaFilterEnd}
+                      onChange={(e) => setVisaFilterEnd(e.target.value)}
+                    />
+                  </div>
+                  <CButton
+                    color="success"
+                    size="sm"
+                    className="w-100 d-flex align-items-center justify-content-center gap-2 text-white"
+                    style={{
+                      background: 'linear-gradient(135deg, #059669, #047857)',
+                      border: 'none',
+                      transition: 'all 0.2s',
+                      borderRadius: '8px',
+                      padding: '8px',
+                      fontWeight: '600'
+                    }}
+                    onClick={generateVisaReport}
+                  >
+                    <CIcon icon={cilCloudDownload} size="sm" /> Download Visa Report
+                  </CButton>
+                </div>
+              </div>
+            </CCol>
           </CRow>
         </CModalBody>
         <CModalFooter className="border-0">
-          <CButton color="light" onClick={() => setShowExportModal(false)}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={generateReport} disabled={exportServices.length === 0}>
-            Download Report
+          <CButton color="light" onClick={() => setShowExportModal(false)} style={{ borderRadius: '8px' }}>
+            Close
           </CButton>
         </CModalFooter>
       </CModal>
