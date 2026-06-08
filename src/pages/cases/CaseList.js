@@ -106,12 +106,19 @@ const CaseList = () => {
       const matchRelocationId = c.relocationId?.toLowerCase().includes(query)
       const matchBilling = c.billingEntity?.toLowerCase().includes(query)
       const matchEmployer = c.employer?.toLowerCase().includes(query)
-      const matchEmail = (c.officialEmailAddress?.toLowerCase().includes(query) || c.personalEmailAddress?.toLowerCase().includes(query))
-      const matchPhone = (c.mobileNumber?.toLowerCase().includes(query) || c.hostPhoneNumber?.toLowerCase().includes(query))
+      const matchEmail =
+        c.officialEmailAddress?.toLowerCase().includes(query) ||
+        c.personalEmailAddress?.toLowerCase().includes(query)
+      const matchPhone =
+        c.mobileNumber?.toLowerCase().includes(query) ||
+        c.hostPhoneNumber?.toLowerCase().includes(query)
       const matchStatus = c.status?.toLowerCase().includes(query)
       const matchManager = c.assignedCaseManager?.username?.toLowerCase().includes(query)
-      const matchFrom = (c.movingFromCity?.toLowerCase().includes(query) || c.movingFromCountry?.toLowerCase().includes(query))
-      const matchTo = (c.city?.toLowerCase().includes(query) || c.movingToCountry?.toLowerCase().includes(query))
+      const matchFrom =
+        c.movingFromCity?.toLowerCase().includes(query) ||
+        c.movingFromCountry?.toLowerCase().includes(query)
+      const matchTo =
+        c.city?.toLowerCase().includes(query) || c.movingToCountry?.toLowerCase().includes(query)
       const matchEmpNo = c.empNumber?.toLowerCase().includes(query)
 
       if (
@@ -245,8 +252,8 @@ const CaseList = () => {
   }
 
   const user = authService.getCurrentUser()
-  const userRole = user?.role || ""
-  
+  const userRole = user?.role || ''
+
   const canCreateCase = hasPermission(userRole, 'canCreateCase')
   const canDeleteCase = hasPermission(userRole, 'canDeleteCase')
   const canEditCase = hasPermission(userRole, 'canEditCase')
@@ -322,8 +329,11 @@ const CaseList = () => {
               <>
                 <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
                   <div className="text-muted small">
-                    Showing {filteredCases.length === 0 ? 0 : Math.min(filteredCases.length, (currentPage - 1) * pageSize + 1)} to{' '}
-                    {Math.min(filteredCases.length, currentPage * pageSize)} of{' '}
+                    Showing{' '}
+                    {filteredCases.length === 0
+                      ? 0
+                      : Math.min(filteredCases.length, (currentPage - 1) * pageSize + 1)}{' '}
+                    to {Math.min(filteredCases.length, currentPage * pageSize)} of{' '}
                     {filteredCases.length} entries
                   </div>
                   <div className="d-flex flex-wrap align-items-center gap-3">
@@ -333,7 +343,7 @@ const CaseList = () => {
                         <CIcon icon={cilSearch} />
                       </CInputGroupText>
                       <CFormInput
-                        placeholder="Search assignee, ID, billing..."
+                        placeholder="  Search assignee, ID, billing..."
                         value={searchQuery}
                         onChange={(e) => {
                           setSearchQuery(e.target.value)

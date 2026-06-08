@@ -163,8 +163,8 @@ const CaseAnalytics = () => {
   const [exportServices, setExportServices] = useState([])
 
   // State variables for specialized report date filters
-  const [leaseFilterStart, setLeaseFilterStart] = useState('')
   const [leaseFilterEnd, setLeaseFilterEnd] = useState('')
+  const [leaseTypeFilter, setLeaseTypeFilter] = useState('')
   const [visaFilterStart, setVisaFilterStart] = useState('')
   const [visaFilterEnd, setVisaFilterEnd] = useState('')
   const [sortBy, setSortBy] = useState('default')
@@ -253,11 +253,11 @@ const CaseAnalytics = () => {
         let dateA, dateB
 
         if (reportType === 'lease') {
-          dateA = a.serviceTracking?.homeSearch?.leaseStartDate
-            ? new Date(a.serviceTracking.homeSearch.leaseStartDate)
+          dateA = a.serviceTracking?.homeSearch?.leaseEndDate
+            ? new Date(a.serviceTracking.homeSearch.leaseEndDate)
             : null
-          dateB = b.serviceTracking?.homeSearch?.leaseStartDate
-            ? new Date(b.serviceTracking.homeSearch.leaseStartDate)
+          dateB = b.serviceTracking?.homeSearch?.leaseEndDate
+            ? new Date(b.serviceTracking.homeSearch.leaseEndDate)
             : null
         } else if (reportType === 'visa') {
           dateA = a.serviceTracking?.visa?.startDate
@@ -386,6 +386,7 @@ const CaseAnalytics = () => {
           'Billing Entity',
           'Employer',
           'Relocation Type',
+          'Lease Type',
           'Service Authorization',
           'Tracked Service',
           'Service Start Date',
@@ -404,6 +405,11 @@ const CaseAnalytics = () => {
           const svcStarts = expDetailed.map((e) => e.start).join('\n')
           const svcEnds = expDetailed.map((e) => e.end).join('\n')
 
+          const leaseTypes = []
+          if (c.servicesAuthorized?.personalLease) leaseTypes.push('Personal Lease')
+          if (c.servicesAuthorized?.corporateLease) leaseTypes.push('Corporate Lease')
+          const leaseTypeStr = leaseTypes.length > 0 ? leaseTypes.join(', ') : 'N/A'
+
           rows.push([
             c.assigneeName || 'N/A',
             c.empNumber || 'N/A',
@@ -412,6 +418,7 @@ const CaseAnalytics = () => {
             c.billingEntity || 'N/A',
             c.employer || 'N/A',
             c.relocationType || 'N/A',
+            leaseTypeStr,
             authStr || 'N/A',
             svcLabels || 'N/A',
             svcStarts || 'N/A',
@@ -428,6 +435,7 @@ const CaseAnalytics = () => {
           'Billing Entity',
           'Employer',
           'Relocation Type',
+          'Lease Type',
           'Status',
           'Case Manager',
           'Service Authorization',
@@ -448,6 +456,11 @@ const CaseAnalytics = () => {
           const svcStarts = expDetailed.map((e) => e.start).join('\n')
           const svcEnds = expDetailed.map((e) => e.end).join('\n')
 
+          const leaseTypes = []
+          if (c.servicesAuthorized?.personalLease) leaseTypes.push('Personal Lease')
+          if (c.servicesAuthorized?.corporateLease) leaseTypes.push('Corporate Lease')
+          const leaseTypeStr = leaseTypes.length > 0 ? leaseTypes.join(', ') : 'N/A'
+
           rows.push([
             c.assigneeName || 'N/A',
             c.empNumber || 'N/A',
@@ -456,6 +469,7 @@ const CaseAnalytics = () => {
             c.billingEntity || 'N/A',
             c.employer || 'N/A',
             c.relocationType || 'N/A',
+            leaseTypeStr,
             c.status || 'N/A',
             c.assignedCaseManager?.username || 'Unassigned',
             authStr || 'N/A',
@@ -468,15 +482,15 @@ const CaseAnalytics = () => {
       }
 
       const ws = XLSX.utils.aoa_to_sheet(rows)
-      
+
       // Auto-set column widths for readability
       const colWidths = []
       rows[2]?.forEach((_, i) => {
         let maxLen = 15
-        rows.forEach(row => {
+        rows.forEach((row) => {
           const val = row[i]?.toString() || ''
           const lines = val.split('\n')
-          lines.forEach(line => {
+          lines.forEach((line) => {
             if (line.length > maxLen) maxLen = line.length
           })
         })
@@ -537,36 +551,31 @@ const CaseAnalytics = () => {
           return false
         }
 
-        const leaseStart = c.serviceTracking?.homeSearch?.leaseStartDate
-          ? new Date(c.serviceTracking.homeSearch.leaseStartDate).setHours(0, 0, 0, 0)
-          : null
+        if (leaseTypeFilter === 'personal' && !auth.personalLease) {
+          return false
+        }
+        if (leaseTypeFilter === 'corporate' && !auth.corporateLease) {
+          return false
+        }
+
         const leaseEnd = c.serviceTracking?.homeSearch?.leaseEndDate
           ? new Date(c.serviceTracking.homeSearch.leaseEndDate).setHours(0, 0, 0, 0)
           : null
 
-        if (!leaseFilterStart && !leaseFilterEnd) {
+        if (!leaseFilterEnd) {
           return true
         }
 
-        let startMatch = true
-        let endMatch = true
-
-        if (leaseFilterStart) {
-          const fStart = new Date(leaseFilterStart).setHours(0, 0, 0, 0)
-          if (!leaseStart || leaseStart < fStart) startMatch = false
-          if (!leaseEnd || leaseEnd < fStart) endMatch = false
-        }
-        if (leaseFilterEnd) {
-          const fEnd = new Date(leaseFilterEnd).setHours(23, 59, 59, 999)
-          if (!leaseStart || leaseStart > fEnd) startMatch = false
-          if (!leaseEnd || leaseEnd > fEnd) endMatch = false
+        if (!leaseEnd) {
+          return false
         }
 
-        return startMatch || endMatch
+        const fEnd = new Date(leaseFilterEnd).setHours(23, 59, 59, 999)
+        return leaseEnd <= fEnd
       })
 
       if (filteredCases.length === 0) {
-        toast.warning('No cases match the specified Lease date range')
+        toast.warning('No cases match the specified Lease filters')
         return
       }
 
@@ -577,14 +586,16 @@ const CaseAnalytics = () => {
 
       const rows = []
 
-      const reportTitle = `Lease Service Report of ${isAdminRole ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
+      const leaseTypeLabel =
+        leaseTypeFilter === 'personal'
+          ? 'Personal'
+          : leaseTypeFilter === 'corporate'
+            ? 'Corporate'
+            : 'Personal & Corporate'
+      const reportTitle = `${leaseTypeLabel} Lease Service Report of ${isAdminRole ? 'Admin' : role === 'HR' ? 'HR' : 'Case Manager'}`
       rows.push([reportTitle])
-      if (leaseFilterStart || leaseFilterEnd) {
-        rows.push([
-          `Duration: ${leaseFilterStart ? fmt(leaseFilterStart) : 'Start'} to ${
-            leaseFilterEnd ? fmt(leaseFilterEnd) : 'End'
-          }`,
-        ])
+      if (leaseFilterEnd) {
+        rows.push([`Duration: Expiring on or before ${fmt(leaseFilterEnd)}`])
       } else {
         rows.push([`Duration: All Leases`])
       }
@@ -598,6 +609,7 @@ const CaseAnalytics = () => {
         'Billing Entity',
         'Employer',
         'Relocation Type',
+        'Lease Type',
         'Status',
         'Case Manager',
         'Property Address',
@@ -610,6 +622,11 @@ const CaseAnalytics = () => {
       ])
 
       sortedCases.forEach((c) => {
+        const leaseTypes = []
+        if (c.servicesAuthorized?.personalLease) leaseTypes.push('Personal Lease')
+        if (c.servicesAuthorized?.corporateLease) leaseTypes.push('Corporate Lease')
+        const leaseTypeStr = leaseTypes.length > 0 ? leaseTypes.join(', ') : 'N/A'
+
         rows.push([
           c.assigneeName || 'N/A',
           c.empNumber || 'N/A',
@@ -618,6 +635,7 @@ const CaseAnalytics = () => {
           c.billingEntity || 'N/A',
           c.employer || 'N/A',
           c.relocationType || 'N/A',
+          leaseTypeStr,
           c.status || 'N/A',
           c.assignedCaseManager?.username || 'Unassigned',
           c.serviceTracking?.homeSearch?.propertyAddress || 'N/A',
@@ -649,7 +667,13 @@ const CaseAnalytics = () => {
 
       XLSX.utils.book_append_sheet(wb, ws, 'Lease Report')
 
-      XLSX.writeFile(wb, `Lease_Report_${new Date().toISOString().split('T')[0]}.xlsx`)
+      const fileLeaseType = leaseTypeFilter
+        ? `_${leaseTypeFilter.charAt(0).toUpperCase() + leaseTypeFilter.slice(1)}`
+        : ''
+      XLSX.writeFile(
+        wb,
+        `Lease${fileLeaseType}_Report_${new Date().toISOString().split('T')[0]}.xlsx`,
+      )
       toast.success('Lease Report downloaded successfully')
       setShowExportModal(false)
     } catch (err) {
@@ -880,12 +904,11 @@ const CaseAnalytics = () => {
   }
 
   /* ── Role-specific title ── */
-  const dashTitle =
-    isAdminRole
-      ? 'Admin Analytics Overview'
-      : role === 'HR'
-        ? 'My Cases Analytics'
-        : 'My Assigned Cases'
+  const dashTitle = isAdminRole
+    ? 'Admin Analytics Overview'
+    : role === 'HR'
+      ? 'My Cases Analytics'
+      : 'My Assigned Cases'
 
   return (
     <CRow>
@@ -1914,7 +1937,10 @@ const CaseAnalytics = () => {
         </CModalHeader>
         <CModalBody className="px-4 py-3">
           {/* Report Sorting Panel */}
-          <div className="mb-4 p-3 rounded border-0" style={{ background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px' }}>
+          <div
+            className="mb-4 p-3 rounded border-0"
+            style={{ background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px' }}
+          >
             <div className="row align-items-center">
               <div className="col-sm-5 col-md-4">
                 <span className="fw-bold text-dark small d-block">Report Sorting Preference</span>
@@ -1931,8 +1957,12 @@ const CaseAnalytics = () => {
                   <option value="default">Default (Creation Date - Newest First)</option>
                   <option value="nameAsc">Employee Name (A to Z)</option>
                   <option value="nameDesc">Employee Name (Z to A)</option>
-                  <option value="dateAsc">Date - Oldest First (Lease/Visa Start or Creation Date)</option>
-                  <option value="dateDesc">Date - Newest First (Lease/Visa Start or Creation Date)</option>
+                  <option value="dateAsc">
+                    Date - Oldest First (Lease End/Visa Start or Creation Date)
+                  </option>
+                  <option value="dateDesc">
+                    Date - Newest First (Lease End/Visa Start or Creation Date)
+                  </option>
                 </CFormSelect>
               </div>
             </div>
@@ -1965,11 +1995,13 @@ const CaseAnalytics = () => {
                 </CCol>
               ))}
             </CRow>
-            
+
             {/* Standard Report Date Interval Filters */}
             <CRow className="g-3 mb-3">
               <CCol md={6}>
-                <label className="form-label small fw-semibold text-muted mb-1">Case Start Date (From)</label>
+                <label className="form-label small fw-semibold text-muted mb-1">
+                  Case Start Date (From)
+                </label>
                 <input
                   type="date"
                   className="form-control form-control-sm"
@@ -1979,7 +2011,9 @@ const CaseAnalytics = () => {
                 />
               </CCol>
               <CCol md={6}>
-                <label className="form-label small fw-semibold text-muted mb-1">Case Start Date (To)</label>
+                <label className="form-label small fw-semibold text-muted mb-1">
+                  Case Start Date (To)
+                </label>
                 <input
                   type="date"
                   className="form-control form-control-sm"
@@ -1991,7 +2025,12 @@ const CaseAnalytics = () => {
             </CRow>
 
             <div className="d-flex justify-content-end">
-              <CButton color="primary" onClick={generateReport} disabled={exportServices.length === 0} style={{ borderRadius: '8px' }}>
+              <CButton
+                color="primary"
+                onClick={generateReport}
+                disabled={exportServices.length === 0}
+                style={{ borderRadius: '8px' }}
+              >
                 <CIcon icon={cilCloudDownload} className="me-1" /> Download Standard Report
               </CButton>
             </div>
@@ -2000,7 +2039,10 @@ const CaseAnalytics = () => {
           {/* Separator */}
           <div className="my-4 d-flex align-items-center">
             <div className="flex-grow-1 border-bottom" style={{ borderColor: '#e2e8f0' }}></div>
-            <span className="px-3 text-uppercase fw-bold text-muted small" style={{ letterSpacing: '1px', fontSize: '11px' }}>
+            <span
+              className="px-3 text-uppercase fw-bold text-muted small"
+              style={{ letterSpacing: '1px', fontSize: '11px' }}
+            >
               Specialized Reports
             </span>
             <div className="flex-grow-1 border-bottom" style={{ borderColor: '#e2e8f0' }}></div>
@@ -2010,29 +2052,47 @@ const CaseAnalytics = () => {
           <CRow className="g-4 mb-2">
             {/* Lease Report */}
             <CCol md={6}>
-              <div className="h-100 border rounded" style={{ background: '#f8fafc', overflow: 'hidden', borderColor: '#e2e8f0' }}>
-                <div className="p-3" style={{ background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)' }}>
-                  <h6 className="fw-bold mb-1 text-sky-900" style={{ fontSize: '15px' }}>Lease Duration Report</h6>
-                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>Export cases within a specific lease interval</small>
+              <div
+                className="h-100 border rounded"
+                style={{ background: '#f8fafc', overflow: 'hidden', borderColor: '#e2e8f0' }}
+              >
+                <div
+                  className="p-3"
+                  style={{ background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)' }}
+                >
+                  <h6 className="fw-bold mb-1 text-sky-900" style={{ fontSize: '15px' }}>
+                    Lease Expiry Report
+                  </h6>
+                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>
+                    Export cases expiring by a specific lease end date
+                  </small>
                 </div>
                 <div className="p-3">
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold text-muted mb-1">Lease Start Date</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      value={leaseFilterStart}
-                      onChange={(e) => setLeaseFilterStart(e.target.value)}
-                    />
-                  </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-semibold text-muted mb-1">Lease End Date</label>
+                    <label className="form-label small fw-semibold text-muted mb-1">
+                      Lease End Date
+                    </label>
                     <input
                       type="date"
                       className="form-control form-control-sm"
                       value={leaseFilterEnd}
                       onChange={(e) => setLeaseFilterEnd(e.target.value)}
                     />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-semibold text-muted mb-1">
+                      Lease Type
+                    </label>
+                    <CFormSelect
+                      size="sm"
+                      value={leaseTypeFilter}
+                      onChange={(e) => setLeaseTypeFilter(e.target.value)}
+                      style={{ borderRadius: '6px' }}
+                    >
+                      <option value="">Both (Personal & Corporate)</option>
+                      <option value="personal">Personal Lease</option>
+                      <option value="corporate">Corporate Lease</option>
+                    </CFormSelect>
                   </div>
                   <CButton
                     color="info"
@@ -2044,7 +2104,7 @@ const CaseAnalytics = () => {
                       transition: 'all 0.2s',
                       borderRadius: '8px',
                       padding: '8px',
-                      fontWeight: '600'
+                      fontWeight: '600',
                     }}
                     onClick={generateLeaseReport}
                   >
@@ -2056,14 +2116,26 @@ const CaseAnalytics = () => {
 
             {/* Visa Report */}
             <CCol md={6}>
-              <div className="h-100 border rounded" style={{ background: '#f8fafc', overflow: 'hidden', borderColor: '#e2e8f0' }}>
-                <div className="p-3" style={{ background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)' }}>
-                  <h6 className="fw-bold mb-1 text-emerald-900" style={{ fontSize: '15px' }}>Visa Validity Report</h6>
-                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>Export cases within a specific visa interval</small>
+              <div
+                className="h-100 border rounded"
+                style={{ background: '#f8fafc', overflow: 'hidden', borderColor: '#e2e8f0' }}
+              >
+                <div
+                  className="p-3"
+                  style={{ background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)' }}
+                >
+                  <h6 className="fw-bold mb-1 text-emerald-900" style={{ fontSize: '15px' }}>
+                    Visa Expiry Report
+                  </h6>
+                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>
+                    Export cases within a specific visa interval
+                  </small>
                 </div>
                 <div className="p-3">
                   <div className="mb-2">
-                    <label className="form-label small fw-semibold text-muted mb-1">Visa Start Date</label>
+                    <label className="form-label small fw-semibold text-muted mb-1">
+                      Visa Start Date
+                    </label>
                     <input
                       type="date"
                       className="form-control form-control-sm"
@@ -2072,7 +2144,9 @@ const CaseAnalytics = () => {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-semibold text-muted mb-1">Visa End Date</label>
+                    <label className="form-label small fw-semibold text-muted mb-1">
+                      Visa End Date
+                    </label>
                     <input
                       type="date"
                       className="form-control form-control-sm"
@@ -2090,7 +2164,7 @@ const CaseAnalytics = () => {
                       transition: 'all 0.2s',
                       borderRadius: '8px',
                       padding: '8px',
-                      fontWeight: '600'
+                      fontWeight: '600',
                     }}
                     onClick={generateVisaReport}
                   >
@@ -2102,7 +2176,11 @@ const CaseAnalytics = () => {
           </CRow>
         </CModalBody>
         <CModalFooter className="border-0">
-          <CButton color="light" onClick={() => setShowExportModal(false)} style={{ borderRadius: '8px' }}>
+          <CButton
+            color="light"
+            onClick={() => setShowExportModal(false)}
+            style={{ borderRadius: '8px' }}
+          >
             Close
           </CButton>
         </CModalFooter>
