@@ -65,6 +65,11 @@ const CaseDetails = () => {
     visa: {},
     tenancyManagement: {},
     aadharCard: {},
+    simCardConnection: {},
+    departure: {},
+    cForm: {},
+    petShipment: {},
+    leaseRenewal: {},
     homeSearchBudget: '',
     householdGoodsLimit: '',
     visaDetails: {},
@@ -138,6 +143,11 @@ const CaseDetails = () => {
         visa: data.serviceTracking?.visa || {},
         tenancyManagement: data.serviceTracking?.tenancyManagement || {},
         aadharCard: data.serviceTracking?.aadharCard || {},
+        simCardConnection: data.serviceTracking?.simCardConnection || {},
+        departure: data.serviceTracking?.departure || {},
+        cForm: data.serviceTracking?.cForm || {},
+        petShipment: data.serviceTracking?.petShipment || {},
+        leaseRenewal: data.serviceTracking?.leaseRenewal || {},
         homeSearchBudget: data.homeSearchBudget || '',
         householdGoodsLimit: data.householdGoodsLimit || '',
         visaDetails: data.visaDetails || {},
@@ -658,6 +668,61 @@ const CaseDetails = () => {
                     style={{ cursor: 'pointer' }}
                   >
                     Aadhar Card
+                  </CNavLink>
+                </CNavItem>
+              )}
+              {services.simCardConnection && (
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'simCardConnection'}
+                    onClick={() => setActiveTab('simCardConnection')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Sim Card Connection
+                  </CNavLink>
+                </CNavItem>
+              )}
+              {services.departure && (
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'departure'}
+                    onClick={() => setActiveTab('departure')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Departure
+                  </CNavLink>
+                </CNavItem>
+              )}
+              {services.cForm && (
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'cForm'}
+                    onClick={() => setActiveTab('cForm')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    C Form
+                  </CNavLink>
+                </CNavItem>
+              )}
+              {services.petShipment && (
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'petShipment'}
+                    onClick={() => setActiveTab('petShipment')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Pet Shipment
+                  </CNavLink>
+                </CNavItem>
+              )}
+              {services.leaseRenewal && (
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'leaseRenewal'}
+                    onClick={() => setActiveTab('leaseRenewal')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Lease Renewal
                   </CNavLink>
                 </CNavItem>
               )}
@@ -1569,6 +1634,295 @@ const CaseDetails = () => {
                             onChange={(e) => setDocumentType(e.target.value)}
                           >
                             <option value="Aadhar Card Document">Aadhar Card Document</option>
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={6}>
+                          <CFormLabel>File</CFormLabel>
+                          <CFormInput type="file" onChange={handleDocumentChange} />
+                        </CCol>
+                        <CCol md={2}>
+                          <CButton
+                            type="submit"
+                            color="primary"
+                            className="w-100"
+                          >
+                            Save & Upload
+                          </CButton>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )}
+                </CForm>
+              </CTabPane>
+
+              {/* SIM CARD CONNECTION TAB */}
+              <CTabPane visible={activeTab === 'simCardConnection'}>
+                <CForm onSubmit={(e) => handleUpdateTracking(e, 'simCardConnection')}>
+                  <CRow className="mb-3">
+                    <CCol md={6}>
+                      <CFormLabel>Connection Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.simCardConnection?.connectionDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('simCardConnection', 'connectionDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel>Phone Number</CFormLabel>
+                      <CFormInput
+                        value={trackingData.simCardConnection?.phoneNumber || ''}
+                        onChange={(e) =>
+                          handleTrackingChange('simCardConnection', 'phoneNumber', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                  </CRow>
+                  {canEditTracking && (
+                    <div className="bg-light p-3 rounded mt-4">
+                      <h6>Upload Sim Card Connection Documents</h6>
+                      <CRow className="align-items-end">
+                        <CCol md={4}>
+                          <CFormLabel>Document Type</CFormLabel>
+                          <CFormSelect
+                            value={documentType}
+                            onChange={(e) => setDocumentType(e.target.value)}
+                          >
+                            <option value="Sim Card Confirmation">Sim Card Confirmation</option>
+                            <option value="Other">Other</option>
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={6}>
+                          <CFormLabel>File</CFormLabel>
+                          <CFormInput type="file" onChange={handleDocumentChange} />
+                        </CCol>
+                        <CCol md={2}>
+                          <CButton
+                            type="submit"
+                            color="primary"
+                            className="w-100"
+                          >
+                            Save & Upload
+                          </CButton>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )}
+                </CForm>
+              </CTabPane>
+
+              {/* DEPARTURE TAB */}
+              <CTabPane visible={activeTab === 'departure'}>
+                <CForm onSubmit={(e) => handleUpdateTracking(e, 'departure')}>
+                  <CRow className="mb-3">
+                    <CCol md={6}>
+                      <CFormLabel>Property Handover Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.departure?.propertyClosureDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('departure', 'propertyClosureDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                  </CRow>
+                  {canEditTracking && (
+                    <div className="bg-light p-3 rounded mt-4">
+                      <h6>Upload Departure Documents</h6>
+                      <CRow className="align-items-end">
+                        <CCol md={4}>
+                          <CFormLabel>Document Type</CFormLabel>
+                          <CFormSelect
+                            value={documentType}
+                            onChange={(e) => setDocumentType(e.target.value)}
+                          >
+                            <option value="Property Closure Doc">Property Closure Doc</option>
+                            <option value="Other">Other</option>
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={6}>
+                          <CFormLabel>File</CFormLabel>
+                          <CFormInput type="file" onChange={handleDocumentChange} />
+                        </CCol>
+                        <CCol md={2}>
+                          <CButton
+                            type="submit"
+                            color="primary"
+                            className="w-100"
+                          >
+                            Save & Upload
+                          </CButton>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )}
+                </CForm>
+              </CTabPane>
+
+              {/* C FORM TAB */}
+              <CTabPane visible={activeTab === 'cForm'}>
+                <CForm onSubmit={(e) => handleUpdateTracking(e, 'cForm')}>
+                  <CRow className="mb-3">
+                    <CCol md={6}>
+                      <CFormLabel>Submission Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.cForm?.submissionDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('cForm', 'submissionDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel>Expiry Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.cForm?.expiryDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('cForm', 'expiryDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                  </CRow>
+                  {canEditTracking && (
+                    <div className="bg-light p-3 rounded mt-4">
+                      <h6>Upload C-Form Documents</h6>
+                      <CRow className="align-items-end">
+                        <CCol md={4}>
+                          <CFormLabel>Document Type</CFormLabel>
+                          <CFormSelect
+                            value={documentType}
+                            onChange={(e) => setDocumentType(e.target.value)}
+                          >
+                            <option value="C-Form Copy">C-Form Copy</option>
+                            <option value="Other">Other</option>
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={6}>
+                          <CFormLabel>File</CFormLabel>
+                          <CFormInput type="file" onChange={handleDocumentChange} />
+                        </CCol>
+                        <CCol md={2}>
+                          <CButton
+                            type="submit"
+                            color="primary"
+                            className="w-100"
+                          >
+                            Save & Upload
+                          </CButton>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )}
+                </CForm>
+              </CTabPane>
+
+              {/* PET SHIPMENT TAB */}
+              <CTabPane visible={activeTab === 'petShipment'}>
+                <CForm onSubmit={(e) => handleUpdateTracking(e, 'petShipment')}>
+                  <CRow className="mb-3">
+                    <CCol md={6}>
+                      <CFormLabel>Shipment Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.petShipment?.shipmentDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('petShipment', 'shipmentDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel>Delivery Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.petShipment?.deliveryDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('petShipment', 'deliveryDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                  </CRow>
+                  {canEditTracking && (
+                    <div className="bg-light p-3 rounded mt-4">
+                      <h6>Upload Pet Shipment Documents</h6>
+                      <CRow className="align-items-end">
+                        <CCol md={4}>
+                          <CFormLabel>Document Type</CFormLabel>
+                          <CFormSelect
+                            value={documentType}
+                            onChange={(e) => setDocumentType(e.target.value)}
+                          >
+                            <option value="Pet Health Cert">Pet Health Cert</option>
+                            <option value="Permit Copy">Permit Copy</option>
+                            <option value="Other">Other</option>
+                          </CFormSelect>
+                        </CCol>
+                        <CCol md={6}>
+                          <CFormLabel>File</CFormLabel>
+                          <CFormInput type="file" onChange={handleDocumentChange} />
+                        </CCol>
+                        <CCol md={2}>
+                          <CButton
+                            type="submit"
+                            color="primary"
+                            className="w-100"
+                          >
+                            Save & Upload
+                          </CButton>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )}
+                </CForm>
+              </CTabPane>
+
+              {/* LEASE RENEWAL TAB */}
+              <CTabPane visible={activeTab === 'leaseRenewal'}>
+                <CForm onSubmit={(e) => handleUpdateTracking(e, 'leaseRenewal')}>
+                  <CRow className="mb-3">
+                    <CCol md={6}>
+                      <CFormLabel>Start Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.leaseRenewal?.startDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('leaseRenewal', 'startDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                    <CCol md={6}>
+                      <CFormLabel>End Date</CFormLabel>
+                      <CFormInput
+                        type="date"
+                        value={formatDateForInput(trackingData.leaseRenewal?.endDate)}
+                        onChange={(e) =>
+                          handleTrackingChange('leaseRenewal', 'endDate', e.target.value)
+                        }
+                        disabled={!canEditTracking}
+                      />
+                    </CCol>
+                  </CRow>
+                  {canEditTracking && (
+                    <div className="bg-light p-3 rounded mt-4">
+                      <h6>Upload Lease Renewal Documents</h6>
+                      <CRow className="align-items-end">
+                        <CCol md={4}>
+                          <CFormLabel>Document Type</CFormLabel>
+                          <CFormSelect
+                            value={documentType}
+                            onChange={(e) => setDocumentType(e.target.value)}
+                          >
+                            <option value="Renewed Lease Agreement">Renewed Lease Agreement</option>
+                            <option value="Other">Other</option>
                           </CFormSelect>
                         </CCol>
                         <CCol md={6}>

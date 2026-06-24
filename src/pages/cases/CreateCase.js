@@ -262,6 +262,7 @@ const CreateCase = () => {
       aadharCard: false,
       cForm: false,
       petShipment: false,
+      leaseRenewal: false,
       other: false,
     },
     serviceTracking: {
@@ -288,6 +289,10 @@ const CreateCase = () => {
       tenancyManagement: { startDate: '', endDate: '' },
       departure: { propertyClosureDate: '' },
       aadharCard: { expiryDate: '' },
+      simCardConnection: { connectionDate: '', phoneNumber: '' },
+      cForm: { submissionDate: '', expiryDate: '' },
+      petShipment: { shipmentDate: '', deliveryDate: '' },
+      leaseRenewal: { startDate: '', endDate: '' },
     },
     homeSearchBudget: '',
     householdGoodsLimit: '',
@@ -987,7 +992,7 @@ const CreateCase = () => {
                       .filter(
                         (k) =>
                           formData.relocationType === 'International' ||
-                          ['homeSearch', 'schoolSearch', 'householdGoodsMovement', 'petShipment'].includes(k),
+                          ['homeSearch', 'schoolSearch', 'householdGoodsMovement', 'petShipment', 'leaseRenewal'].includes(k),
                       )
                       .map((sk) => (
                         <CCol md={6} xl={4} key={sk} className="mb-3">
@@ -1266,6 +1271,161 @@ const CreateCase = () => {
                                 handleServiceTrackingChange(
                                   'departure',
                                   'propertyClosureDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.simCardConnection && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          SIM CARD CONNECTION
+                        </strong>
+                        <CRow className="g-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Connection Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.simCardConnection?.connectionDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'simCardConnection',
+                                  'connectionDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Phone Number</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              value={formData.serviceTracking.simCardConnection?.phoneNumber || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'simCardConnection',
+                                  'phoneNumber',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.cForm && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          C FORM STATUS
+                        </strong>
+                        <CRow className="g-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Submission Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.cForm?.submissionDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'cForm',
+                                  'submissionDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Expiry Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.cForm?.expiryDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'cForm',
+                                  'expiryDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.petShipment && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          PET SHIPMENT LOGISTICS
+                        </strong>
+                        <CRow className="g-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Shipment Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.petShipment?.shipmentDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'petShipment',
+                                  'shipmentDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Delivery Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.petShipment?.deliveryDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'petShipment',
+                                  'deliveryDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                        </CRow>
+                      </div>
+                    )}
+                    {formData.servicesAuthorized.leaseRenewal && (
+                      <div className="mb-3 p-3 border rounded bg-white">
+                        <strong className="text-secondary small d-block mb-3 border-bottom pb-1">
+                          LEASE RENEWAL TIMELINE
+                        </strong>
+                        <CRow className="g-3">
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">Start Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.leaseRenewal?.startDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'leaseRenewal',
+                                  'startDate',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </CCol>
+                          <CCol md={6}>
+                            <CFormLabel className="small fw-bold">End Date</CFormLabel>
+                            <CFormInput
+                              size="sm"
+                              type="date"
+                              value={formData.serviceTracking.leaseRenewal?.endDate || ''}
+                              onChange={(e) =>
+                                handleServiceTrackingChange(
+                                  'leaseRenewal',
+                                  'endDate',
                                   e.target.value,
                                 )
                               }

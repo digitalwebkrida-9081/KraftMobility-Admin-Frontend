@@ -1,0 +1,28 @@
+Dependencies
+
+node_modules/
+vendor/
+.pnp
+.pnp.js
+
+Build Outputs
+
+.next/
+out/
+dist/
+build/
+coverage/
+
+Auto-generated files
+
+.generated.
+graphify-out/
+
+Environment Variables & Secrets
+
+.env
+.env.*
+
+Logs
+
+*.log

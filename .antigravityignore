@@ -1,0 +1,31 @@
+Dependencies (The biggest token drain)
+
+node_modules/
+.pnp
+.pnp.js
+
+Next.js & Vite Build Outputs
+
+.next/
+out/
+dist/
+build/
+
+NestJS & Compiled Backend Code
+
+dist/
+coverage/
+
+Logs and Debugging
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+
+OS Generated Files
+
+.DS_Store
+Thumbs.db
